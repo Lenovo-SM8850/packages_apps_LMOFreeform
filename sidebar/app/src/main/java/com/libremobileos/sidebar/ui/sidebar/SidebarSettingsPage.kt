@@ -16,12 +16,16 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.android.settingslib.spa.framework.compose.rememberDrawablePainter
 import com.android.settingslib.spa.framework.theme.SettingsDimension
+import com.android.settingslib.spa.widget.preference.ListPreference
+import com.android.settingslib.spa.widget.preference.ListPreferenceModel
+import com.android.settingslib.spa.widget.preference.ListPreferenceOption
 import com.android.settingslib.spa.widget.preference.MainSwitchPreference
 import com.android.settingslib.spa.widget.preference.Preference
 import com.android.settingslib.spa.widget.preference.PreferenceModel
@@ -115,6 +119,15 @@ fun SidebarSettingsPage(
                     isChecked = viewModel.getPredictedAppsEnabled(),
                     onCheckedChange = { viewModel.setPredictedAppsEnabled(it) }
                 )
+                SidebarSettingSwitch(
+                    title = stringResource(R.string.smart_clipboard_label),
+                    summary = stringResource(R.string.smart_clipboard_summary),
+                    isChecked = viewModel.getSmartClipboardEnabled(),
+                    onCheckedChange = { viewModel.setSmartClipboardEnabled(it) }
+                )
+                if (viewModel.getSmartClipboardEnabled()) {
+                    SidebarExpirationPreference(viewModel)
+                }
             }
             
             if (mainChecked.value) {
@@ -193,4 +206,31 @@ fun SidebarSettingSwitch(
             }
         },
     )
+}
+
+@Composable
+fun SidebarExpirationPreference(viewModel: SidebarSettingsViewModel) {
+    val expiration = rememberSaveable { mutableIntStateOf(viewModel.getClipboardExpirationHours()) }
+    val titleStr = stringResource(R.string.smart_clipboard_expiration_label)
+    val opt1 = stringResource(R.string.smart_clipboard_expiration_1_hour)
+    val opt24 = stringResource(R.string.smart_clipboard_expiration_1_day)
+    val opt168 = stringResource(R.string.smart_clipboard_expiration_1_week)
+    val opt0 = stringResource(R.string.smart_clipboard_expiration_forever)
+
+    ListPreference(remember(titleStr, opt1, opt24, opt168, opt0) {
+        object : ListPreferenceModel {
+            override val title = titleStr
+            override val options = listOf(
+                ListPreferenceOption(id = 1, text = opt1),
+                ListPreferenceOption(id = 24, text = opt24),
+                ListPreferenceOption(id = 168, text = opt168),
+                ListPreferenceOption(id = 0, text = opt0)
+            )
+            override val selectedId = expiration
+            override val onIdSelected: (Int) -> Unit = {
+                expiration.intValue = it
+                viewModel.setClipboardExpirationHours(it)
+            }
+        }
+    })
 }

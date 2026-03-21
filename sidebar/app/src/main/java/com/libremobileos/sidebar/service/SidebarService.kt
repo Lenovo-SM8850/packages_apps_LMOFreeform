@@ -16,6 +16,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.ServiceManager
 import android.os.UserHandle
+import android.view.DragEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.WindowManager.LayoutParams
@@ -106,6 +107,8 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
         const val SIDELINE_POSITION_X = "sideline_position_x"
         const val SIDELINE_POSITION_Y_PORTRAIT = "sideline_position_y_portrait"
         const val SIDELINE_POSITION_Y_LANDSCAPE = "sideline_position_y_landscape"
+        const val ACTION_IMPORT_TO_SMART_CLIPBOARD =
+            "com.libremobileos.sidebar.action.IMPORT_TO_SMART_CLIPBOARD"
     }
 
     override fun onBind(intent: Intent): IBinder? {
@@ -120,18 +123,45 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
             return START_STICKY // this is just to skip the rest of the code
         }
 
-        logger.d("starting service for user $userId")
-        viewModel = ServiceViewModel(application)
-        windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        iActivityManager = IActivityManager.Stub.asInterface(ServiceManager.getService(Context.ACTIVITY_SERVICE))
-        screenWidth = resources.displayMetrics.widthPixels
-        screenHeight = resources.displayMetrics.heightPixels
-        sharedPrefs = application.applicationContext.getSharedPreferences(SidebarApplication.CONFIG, Context.MODE_PRIVATE)
-        sharedPrefs.registerOnSharedPreferenceChangeListener(this)
-        iActivityManager.registerUserSwitchObserver(userSwitchObserver, TAG)
-        
-        serviceStarted = true
-        
+        if (!serviceStarted) {
+            logger.d("starting service for user $userId")
+            viewModel = ServiceViewModel(application)
+            windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            iActivityManager = IActivityManager.Stub.asInterface(ServiceManager.getService(Context.ACTIVITY_SERVICE))
+            screenWidth = resources.displayMetrics.widthPixels
+            screenHeight = resources.displayMetrics.heightPixels
+            sharedPrefs = application.applicationContext.getSharedPreferences(SidebarApplication.CONFIG, Context.MODE_PRIVATE)
+            sharedPrefs.registerOnSharedPreferenceChangeListener(this)
+            iActivityManager.registerUserSwitchObserver(userSwitchObserver, TAG)
+            serviceStarted = true
+
+            sidebarView = SidebarView(this@SidebarService, viewModel, object : SidebarView.Callback {
+                override fun onRemove() {
+                    logger.d("sidebar view removed")
+                    isShowingSidebar = false
+                    val masterEnabled = sharedPrefs.getBoolean(SIDELINE, false)
+                    val autoEnabled = sharedPrefs.getBoolean(SidebarMonitorService.KEY_AUTO_ENABLED_TEMP, false)
+                    val shouldShowService = masterEnabled || autoEnabled
+                    
+                    logger.d("onRemove - masterEnabled: $masterEnabled, autoEnabled: $autoEnabled, shouldShowService: $shouldShowService, isShowingSideline: $isShowingSideline")
+                    
+                    val hideOnGameSpace = sharedPrefs.getBoolean(SIDEBAR_HIDE_ON_GAMESPACE, false)
+                    if (shouldShowService && isShowingSideline && !(isGameSpaceActive && hideOnGameSpace)) {
+                        sideLineView.animate().cancel()
+                        animateShowSideline()
+                    }
+                }
+            })
+            configureSidelineDragListener()
+            isShowingSidebar = false
+            showSideline = sharedPrefs.getBoolean(SIDELINE, false)
+            val autoEnabled = sharedPrefs.getBoolean(SidebarMonitorService.KEY_AUTO_ENABLED_TEMP, false)
+            val shouldShow = showSideline || autoEnabled
+            
+            logger.d("screenWidth=$screenWidth screenHeight=$screenHeight showSideline=$showSideline autoEnabled=$autoEnabled")
+            if (shouldShow) showView()
+        }
+
         intent?.action?.let { action ->
             when (action) {
                 ACTION_GAME_START -> {
@@ -147,30 +177,13 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
             }
         }
 
-        sidebarView = SidebarView(this@SidebarService, viewModel, object : SidebarView.Callback {
-            override fun onRemove() {
-                logger.d("sidebar view removed")
-                isShowingSidebar = false
-                val masterEnabled = sharedPrefs.getBoolean(SIDELINE, false)
-                val autoEnabled = sharedPrefs.getBoolean(SidebarMonitorService.KEY_AUTO_ENABLED_TEMP, false)
-                val shouldShowService = masterEnabled || autoEnabled
-                
-                logger.d("onRemove - masterEnabled: $masterEnabled, autoEnabled: $autoEnabled, shouldShowService: $shouldShowService, isShowingSideline: $isShowingSideline")
-                
-                val hideOnGameSpace = sharedPrefs.getBoolean(SIDEBAR_HIDE_ON_GAMESPACE, false)
-                if (shouldShowService && isShowingSideline && !(isGameSpaceActive && hideOnGameSpace)) {
-                    sideLineView.animate().cancel()
-                    animateShowSideline()
-                }
-            }
-        })
-        isShowingSidebar = false
-        showSideline = sharedPrefs.getBoolean(SIDELINE, false)
-        val autoEnabled = sharedPrefs.getBoolean(SidebarMonitorService.KEY_AUTO_ENABLED_TEMP, false)
-        val shouldShow = showSideline || autoEnabled
-        
-        logger.d("screenWidth=$screenWidth screenHeight=$screenHeight showSideline=$showSideline autoEnabled=$autoEnabled")
-        if (shouldShow) showView()
+        if (intent?.action == ACTION_IMPORT_TO_SMART_CLIPBOARD) {
+            viewModel.addClipDataToSmartClipboard(
+                clipData = intent.clipData,
+                enableIfNeeded = true,
+                showToast = true
+            )
+        }
         return START_STICKY
     }
 
@@ -420,6 +433,40 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
                 windowManager.updateViewLayout(sideLineView, layoutParams)
             }.onFailure { e ->
                 logger.e("failed to updateViewLayout: ", e)
+            }
+        }
+    }
+
+    private fun configureSidelineDragListener() {
+        sideLineView.setOnDragListener { _, event ->
+            when (event.action) {
+                DragEvent.ACTION_DRAG_STARTED -> {
+                    viewModel.supportsSmartClipboardContent(event.clipDescription)
+                }
+                DragEvent.ACTION_DROP -> {
+                    if (!viewModel.supportsSmartClipboardContent(event.clipDescription)) {
+                        return@setOnDragListener false
+                    }
+                    viewModel.addClipDataToSmartClipboard(
+                        clipData = event.clipData,
+                        enableIfNeeded = true,
+                        showToast = true
+                    )
+                    if (!isShowingSidebar) {
+                        showSidebar()
+                    }
+                    true
+                }
+                DragEvent.ACTION_DRAG_ENTERED -> {
+                    if (!isShowingSidebar && viewModel.supportsSmartClipboardContent(event.clipDescription)) {
+                        showSidebar()
+                    }
+                    true
+                }
+                DragEvent.ACTION_DRAG_LOCATION,
+                DragEvent.ACTION_DRAG_EXITED,
+                DragEvent.ACTION_DRAG_ENDED -> true
+                else -> false
             }
         }
     }
