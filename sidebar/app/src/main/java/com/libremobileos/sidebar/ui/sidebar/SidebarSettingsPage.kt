@@ -33,6 +33,25 @@ import com.libremobileos.sidebar.R
 import com.libremobileos.sidebar.bean.SidebarAppInfo
 import com.libremobileos.sidebar.service.SidebarMonitorService
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.navigation.compose.rememberNavController
+import com.android.settingslib.spa.framework.compose.localNavController
+import com.android.settingslib.spa.widget.preference.ListPreference
+import com.android.settingslib.spa.widget.preference.ListPreferenceModel
+import com.android.settingslib.spa.widget.preference.ListPreferenceOption
+
 @Composable
 fun SidebarSettingsPage(
     viewModel: SidebarSettingsViewModel
@@ -117,6 +136,20 @@ fun SidebarSettingsPage(
                 )
             }
             
+            val clipboardChecked by viewModel.smartClipboardEnabledFlow.collectAsState()
+            if (mainChecked.value || autoEnableChecked.value) {
+                SidebarSettingSwitch(
+                    title = stringResource(R.string.smart_clipboard_label),
+                    summary = stringResource(R.string.smart_clipboard_summary),
+                    isChecked = clipboardChecked,
+                    onCheckedChange = { viewModel.setSmartClipboardEnabled(it) }
+                )
+                if (clipboardChecked) {
+                    SidebarExpirationPreference(viewModel)
+                    SidebarClearHistoryButton(viewModel)
+                }
+            }
+
             if (mainChecked.value) {
                 SidebarAppList(viewModel)
             }
@@ -193,4 +226,42 @@ fun SidebarSettingSwitch(
             }
         },
     )
+}
+
+@Composable
+fun SidebarExpirationPreference(viewModel: SidebarSettingsViewModel) {
+    val expiration by viewModel.expirationMinutesFlow.collectAsState()
+    val titleStr = stringResource(R.string.smart_clipboard_expiration_label)
+    val opt15 = stringResource(R.string.smart_clipboard_expiration_15_min)
+    val opt1 = stringResource(R.string.smart_clipboard_expiration_1_hour)
+    val opt24 = stringResource(R.string.smart_clipboard_expiration_1_day)
+    val opt168 = stringResource(R.string.smart_clipboard_expiration_1_week)
+    val opt0 = stringResource(R.string.smart_clipboard_expiration_forever)
+
+    ListPreference(remember(titleStr, opt15, opt1, opt24, opt168, expiration) {
+        object : ListPreferenceModel {
+            override val title = titleStr
+            override val options = listOf(
+                ListPreferenceOption(id = 15, text = opt15),
+                ListPreferenceOption(id = 60, text = opt1),
+                ListPreferenceOption(id = 1440, text = opt24),
+                ListPreferenceOption(id = 10080, text = opt168),
+                ListPreferenceOption(id = 0, text = opt0)
+            )
+            override val selectedId = mutableIntStateOf(expiration)
+            override val onIdSelected: (Int) -> Unit = {
+                viewModel.setClipboardExpirationHours(it)
+            }
+        }
+    })
+}
+
+@Composable
+fun SidebarClearHistoryButton(viewModel: SidebarSettingsViewModel) {
+    Button(
+        onClick = { viewModel.clearClipboardHistory() },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Text(stringResource(R.string.smart_clipboard_clear_history))
+    }
 }

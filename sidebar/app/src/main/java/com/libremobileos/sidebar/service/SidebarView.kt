@@ -8,6 +8,7 @@ import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.Looper
 import android.os.UserHandle
+import android.view.DragEvent
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -173,7 +174,28 @@ class SidebarView(
             false
         }
 
+        composeView.setOnDragListener { _, event ->
+            when (event.action) {
+                DragEvent.ACTION_DRAG_STARTED -> {
+                    viewModel.supportsSmartClipboardContent(event.clipDescription)
+                }
+                DragEvent.ACTION_DROP -> {
+                    if (!viewModel.supportsSmartClipboardContent(event.clipDescription)) {
+                        return@setOnDragListener false
+                    }
+                    if (!viewModel.importClipboardDrop(event)) return@setOnDragListener false
+                    true
+                }
+                DragEvent.ACTION_DRAG_ENTERED,
+                DragEvent.ACTION_DRAG_LOCATION,
+                DragEvent.ACTION_DRAG_EXITED,
+                DragEvent.ACTION_DRAG_ENDED -> true
+                else -> false
+            }
+        }
+
         handler.post {
+            if (isRemoved) return@post
             lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME) // this also emits ON_START
             runCatching {
                 windowManager.addView(composeView, layoutParams)
