@@ -22,7 +22,8 @@ fun UserManager.getSidebarFilteredUsers(): List<SidebarUserInfo> {
         }
 }
 
-fun UserManager.isSidebarUserAllowed(userInfo: UserInfo): Boolean {
+fun UserManager.isSidebarUserAllowed(userInfo: UserInfo?): Boolean {
+    if (userInfo == null) return false
     val myUserId = UserHandle.myUserId()
     // must be either current user, or current user's parallel space or unlocked profile
     return userInfo.id == myUserId ||
