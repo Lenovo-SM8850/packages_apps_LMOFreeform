@@ -70,6 +70,7 @@ class SidebarView(
 
     init {
         savedStateRegistryController.performRestore(null)
+        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
     }
 
     private fun launchAppInFreeform(appInfo: AppInfo) {
@@ -156,7 +157,7 @@ class SidebarView(
         logger.d("removeView")
         handler.post {
             runCatching {
-                lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+                lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
                 windowManager.removeViewImmediate(composeView)
                 callback.onRemove()
                 isShowing = false
@@ -204,11 +205,10 @@ class SidebarView(
     }
 
     private fun initComposeView() {
-        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
         composeView = ComposeView(context).apply {
             setViewTreeLifecycleOwner(this@SidebarView)
             setViewTreeSavedStateRegistryOwner(this@SidebarView)
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindowOrReleasedFromPool)
             setContent {
                 SidebarTheme {
                     SidebarComposeView(
