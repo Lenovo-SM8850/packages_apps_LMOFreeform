@@ -32,7 +32,7 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
     private lateinit var viewModel: ServiceViewModel
     private lateinit var windowManager: WindowManager
     private lateinit var iActivityManager: IActivityManager
-    private lateinit var sidebarView: SidebarView
+    private var sidebarView: SidebarView? = null
     private lateinit var sharedPrefs: SharedPreferences
     private var userId = 0
     private var serviceStarted = false
@@ -61,7 +61,7 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
             logger.d("onUserSwitchComplete($userId)")
             if (!showSideline) return
             if (newUserId != userId) {
-                removeView(force = true)
+                removeView()
             } else {
                 showView()
             }
@@ -147,23 +147,6 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
             }
         }
 
-        sidebarView = SidebarView(this@SidebarService, viewModel, object : SidebarView.Callback {
-            override fun onRemove() {
-                logger.d("sidebar view removed")
-                isShowingSidebar = false
-                val masterEnabled = sharedPrefs.getBoolean(SIDELINE, false)
-                val autoEnabled = sharedPrefs.getBoolean(SidebarMonitorService.KEY_AUTO_ENABLED_TEMP, false)
-                val shouldShowService = masterEnabled || autoEnabled
-                
-                logger.d("onRemove - masterEnabled: $masterEnabled, autoEnabled: $autoEnabled, shouldShowService: $shouldShowService, isShowingSideline: $isShowingSideline")
-                
-                val hideOnGameSpace = sharedPrefs.getBoolean(SIDEBAR_HIDE_ON_GAMESPACE, false)
-                if (shouldShowService && isShowingSideline && !(isGameSpaceActive && hideOnGameSpace)) {
-                    sideLineView.animate().cancel()
-                    animateShowSideline()
-                }
-            }
-        })
         isShowingSidebar = false
         showSideline = sharedPrefs.getBoolean(SIDELINE, false)
         val autoEnabled = sharedPrefs.getBoolean(SidebarMonitorService.KEY_AUTO_ENABLED_TEMP, false)
@@ -193,7 +176,7 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
             updateSidelinePosition()
         }
         if (isShowingSidebar) {
-            sidebarView.updateSidebarPosition()
+            sidebarView?.updateSidebarPosition()
         }
     }
 
@@ -202,7 +185,7 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
         if (!serviceStarted) return
         sharedPrefs.unregisterOnSharedPreferenceChangeListener(this)
         iActivityManager.unregisterUserSwitchObserver(userSwitchObserver)
-        removeView(force = true)
+        removeView()
         viewModel.destroy()
     }
 
@@ -216,7 +199,7 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
                 if (shouldShow) {
                     showView()
                 } else {
-                    removeView(force = true)
+                    removeView()
                 }
             }
             SidebarMonitorService.KEY_AUTO_ENABLED_TEMP -> {
@@ -227,7 +210,7 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
                 if (shouldShow) {
                     showView()
                 } else {
-                    removeView(force = true)
+                    removeView()
                 }
             }
             SLIDER_TRANSPARENCY -> {
@@ -255,10 +238,31 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
 
     override fun showSidebar() {
         logger.d("showSidebar")
-        sidebarView.showView()
+        if (isShowingSidebar) return
         isShowingSidebar = true
+        sidebarView = createView().apply { showView() }
         animateHideSideline()
     }
+
+    private fun createView() =
+        SidebarView(this@SidebarService, viewModel, object : SidebarView.Callback {
+            override fun onRemove() {
+                logger.d("sidebar view removed")
+                sidebarView = null
+                isShowingSidebar = false
+                val masterEnabled = sharedPrefs.getBoolean(SIDELINE, false)
+                val autoEnabled = sharedPrefs.getBoolean(SidebarMonitorService.KEY_AUTO_ENABLED_TEMP, false)
+                val shouldShowService = masterEnabled || autoEnabled
+
+                logger.d("onRemove - masterEnabled: $masterEnabled, autoEnabled: $autoEnabled, shouldShowService: $shouldShowService, isShowingSideline: $isShowingSideline")
+
+                val hideOnGameSpace = sharedPrefs.getBoolean(SIDEBAR_HIDE_ON_GAMESPACE, false)
+                if (shouldShowService && isShowingSideline && !(isGameSpaceActive && hideOnGameSpace)) {
+                    sideLineView.animate().cancel()
+                    animateShowSideline()
+                }
+            }
+        })
 
     override fun onSwipeToOpen() {
         if (sharedPrefs.getBoolean(SIDEBAR_SWIPE_TO_OPEN, true)) {
@@ -373,13 +377,14 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
 
         updateSidelinePosition()
 
+        isShowingSideline = true
         handler.post {
             runCatching {
                 windowManager.addView(sideLineView, layoutParams)
                 viewModel.registerCallbacks()
-                isShowingSideline = true
             }.onFailure { e ->
                 logger.e("failed to add sideline view: ", e)
+                isShowingSideline = false
             }
         }
     }
@@ -424,22 +429,20 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
         }
     }
 
-    private fun removeView(force: Boolean = false) {
-        if (!isShowingSideline && !force) return
-
+    private fun removeView() {
         logger.d("removeView")
         viewModel.unregisterCallbacks()
-
-        handler.post {
-            runCatching {
-                windowManager.removeViewImmediate(sideLineView)
-            }.onFailure { e ->
-                logger.e("failed to remove sideline view: $e")
+        if (isShowingSideline) {
+            isShowingSideline = false
+            handler.post {
+                runCatching {
+                    windowManager.removeViewImmediate(sideLineView)
+                }.onFailure { e ->
+                    logger.e("failed to remove sideline view: $e")
+                }
             }
         }
-
-        sidebarView.removeView(force)
-        isShowingSideline = false
+        sidebarView?.removeView()
     }
 
     private fun updateSidebarVisibility() {
