@@ -9,14 +9,18 @@ import android.os.Handler
 import android.os.Looper
 import android.os.UserHandle
 import android.view.DragEvent
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.WindowManager.LayoutParams
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.AbstractComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleRegistry
@@ -70,11 +74,24 @@ class SidebarView(
     init {
         savedStateRegistryController.performRestore(null)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
-        composeView = ComposeView(context).apply {
-            setViewTreeLifecycleOwner(this@SidebarView)
-            setViewTreeSavedStateRegistryOwner(this@SidebarView)
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent {
+        composeView = object : AbstractComposeView(context) {
+            private val backCallback = OnBackInvokedCallback { removeView() }
+
+            override fun onAttachedToWindow() {
+                super.onAttachedToWindow()
+                findOnBackInvokedDispatcher()?.registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+                    backCallback
+                )
+            }
+
+            override fun onDetachedFromWindow() {
+                findOnBackInvokedDispatcher()?.unregisterOnBackInvokedCallback(backCallback)
+                super.onDetachedFromWindow()
+            }
+
+            @Composable
+            override fun Content() {
                 SidebarTheme {
                     SidebarComposeView(
                         viewModel = viewModel,
@@ -86,6 +103,10 @@ class SidebarView(
                     )
                 }
             }
+        }.apply {
+            setViewTreeLifecycleOwner(this@SidebarView)
+            setViewTreeSavedStateRegistryOwner(this@SidebarView)
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
         }
     }
 
