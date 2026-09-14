@@ -1,6 +1,9 @@
 package com.android.server.display;
 
 import static com.android.server.display.DisplayDeviceInfo.FLAG_TRUSTED;
+import static com.android.server.display.DisplayDeviceInfo.FLAG_OWN_FOCUS;
+import static com.android.server.display.DisplayDeviceInfo.FLAG_STEAL_TOP_FOCUS_DISABLED;
+import static com.android.server.display.DisplayModeFactory.createMode;
 
 import android.content.Context;
 import android.os.Handler;
@@ -72,7 +75,9 @@ public class LMOFreeformDisplayAdapter extends DisplayAdapter {
         synchronized (getSyncRoot()) {
             IBinder appToken = callback.asBinder();
             FreeformFlags flags = new FreeformFlags(secure, ownContentOnly, shouldShowSystemDecorations);
-	    IBinder displayToken = DisplayControl.createVirtualDisplay(name, flags.mSecure, false /* optimizeForPower */, UNIQUE_ID_PREFIX + name, Process.myUid(), refreshRate);
+            IBinder displayToken = DisplayControl.createVirtualDisplay(name, flags.mSecure,
+                    true /* optimizeForPower */, UNIQUE_ID_PREFIX + name, Process.SYSTEM_UID,
+                    refreshRate);
             FreeformDisplayDevice device = new FreeformDisplayDevice(displayToken, UNIQUE_ID_PREFIX + name, width, height, densityDpi,
                     refreshRate, presentationDeadlineNanos,
                     flags, surface, new Callback(callback, mHandler), callback.asBinder());
@@ -82,12 +87,19 @@ public class LMOFreeformDisplayAdapter extends DisplayAdapter {
             lmoFreeformDisplayCallbackArrayMap.put(device, callback);
 
             mHandler.postDelayed(() -> {
-                LogicalDisplay display = mLogicalDisplayMapper.getDisplayLocked(device);
-                Slog.i(TAG, "findLogicalDisplayForDevice " + display);
                 try {
+                    LogicalDisplay display;
+                    synchronized (getSyncRoot()) {
+                        display = mLogicalDisplayMapper.getDisplayLocked(device);
+                    }
+                    Slog.i(TAG, "findLogicalDisplayForDevice " + display);
+                    if (display == null) {
+                        Slog.w(TAG, "no LogicalDisplay yet for " + device);
+                        return;
+                    }
                     callback.onDisplayAdd(display.getDisplayIdLocked());
-                } catch (Exception ignored) {
-
+                } catch (Exception e) {
+                    Slog.w(TAG, "onDisplayAdd callback failed", e);
                 }
             }, 500);
 
@@ -162,7 +174,8 @@ public class LMOFreeformDisplayAdapter extends DisplayAdapter {
                               FreeformFlags flags,
                               Surface surface, Callback callback, IBinder appToken) {
 
-       super(LMOFreeformDisplayAdapter.this, displayToken, uniqueId, getContext());
+            super(LMOFreeformDisplayAdapter.this, displayToken, uniqueId,
+                    getContext());
             mName = uniqueId;
             mRefreshRate = refreshRate;
             mDisplayPresentationDeadlineNanos = presentationDeadlineNanos;
@@ -175,18 +188,22 @@ public class LMOFreeformDisplayAdapter extends DisplayAdapter {
             mCallback = callback;
             mAppToken = appToken;
             mPendingChanges |= PENDING_SURFACE_CHANGE;
+            mPendingChanges |= PENDING_RESIZE;
         }
 
         public void resizeLocked(int width, int height, int densityDpi) {
-            if (mWidth != width || mHeight != height || mDensityDpi != densityDpi) {
-                sendDisplayDeviceEventLocked(this, DISPLAY_DEVICE_EVENT_CHANGED);
-                sendTraversalRequestLocked();
-                mWidth = width;
-                mHeight = height;
-                mMode = createMode(width, height, mRefreshRate);
-                mDensityDpi = densityDpi;
-                mInfo = null;
-            }
+            if (mWidth == width && mHeight == height && mDensityDpi == densityDpi) return;
+            mWidth = width;
+            mHeight = height;
+            mDensityDpi = densityDpi;
+            mMode = new Display.Mode.Builder()
+                .setResolution(width, height)
+                .setRefreshRate(mRefreshRate)
+                .build();
+            mInfo = null;
+            mPendingChanges |= PENDING_RESIZE;
+            sendDisplayDeviceEventLocked(this, DISPLAY_DEVICE_EVENT_CHANGED);
+            sendTraversalRequestLocked();
         }
 
         private Display.Mode createMode(int width, int height, float refreshRate) {
@@ -210,22 +227,22 @@ public class LMOFreeformDisplayAdapter extends DisplayAdapter {
             return false;
         }
 
-	@Override
-	public void configureSurfaceLocked(SurfaceControl.Transaction t) {
-    	    if ((mPendingChanges & PENDING_SURFACE_CHANGE) != 0) {
+        @Override
+        public void configureSurfaceLocked(SurfaceControl.Transaction t) {
+            if ((mPendingChanges & PENDING_SURFACE_CHANGE) != 0) {
                 setSurfaceLocked(t, mSurface);
-                mPendingChanges &= ~PENDING_SURFACE_CHANGE;
-    	    }
-	}
+            }
+            mPendingChanges &= ~PENDING_SURFACE_CHANGE;
+        }
 
-	@Override
-	public void configureDisplaySizeLocked(SurfaceControl.Transaction t,
-	        DebugTransactionDetails debugTransactionDetails) {
-    	    if ((mPendingChanges & PENDING_RESIZE) != 0) {
-                t.setDisplaySize(getDisplayTokenLocked(), mWidth, mHeight);
-                mPendingChanges &= ~PENDING_RESIZE;
-    	    }
-	}
+        @Override
+        public void configureDisplaySizeLocked(SurfaceControl.Transaction t,
+                                               DebugTransactionDetails debugTransactionDetails) {
+            if ((mPendingChanges & PENDING_RESIZE) != 0) {
+                setDisplaySizeLocked(t, mWidth, mHeight, debugTransactionDetails);
+            }
+            mPendingChanges &= ~PENDING_RESIZE;
+        }
 
         @Override
         public void binderDied() {
@@ -266,8 +283,10 @@ public class LMOFreeformDisplayAdapter extends DisplayAdapter {
                 }
                 mInfo.type = Display.TYPE_OVERLAY;
                 mInfo.touch = DisplayDeviceInfo.TOUCH_VIRTUAL;
-                // The display is trusted since it is created by system.
-                mInfo.flags |= FLAG_TRUSTED;
+                // Keep the virtual display focusable for injected input without allowing it to
+                // steal global focus from the physical display. System navigation must continue
+                // to be driven by the primary display while a freeform window is active.
+                mInfo.flags |= FLAG_TRUSTED | FLAG_OWN_FOCUS | FLAG_STEAL_TOP_FOCUS_DISABLED;
                 mInfo.displayShape = DisplayShape.createDefaultDisplayShape(mInfo.width, mInfo.height, false);
             }
             return mInfo;
