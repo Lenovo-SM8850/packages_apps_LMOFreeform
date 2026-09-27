@@ -20,7 +20,7 @@ import android.view.DragEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.WindowManager.LayoutParams
-import android.widget.Toast
+import android.os.Looper
 import androidx.appcompat.content.res.AppCompatResources
 import com.android.internal.policy.SystemBarUtils
 import com.libremobileos.sidebar.R
@@ -45,7 +45,7 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
     private var screenWidth = 0
     private var screenHeight = 0
     private val layoutParams = LayoutParams()
-    private val handler = Handler()
+    private val handler = Handler(Looper.getMainLooper())
     private val sideLineView by lazy {
         val gestureManager = MGestureManager(this@SidebarService, GestureListener(this@SidebarService))
         View(this).apply {
@@ -159,6 +159,7 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
             val shouldShow = showSideline || autoEnabled
             
             logger.d("screenWidth=$screenWidth screenHeight=$screenHeight showSideline=$showSideline autoEnabled=$autoEnabled")
+            viewModel.registerClipboardCallbacks()
             if (shouldShow) showView()
         }
 
@@ -216,6 +217,7 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
         sharedPrefs.unregisterOnSharedPreferenceChangeListener(this)
         iActivityManager.unregisterUserSwitchObserver(userSwitchObserver)
         removeView(force = true)
+        viewModel.unregisterCallbacks()
         viewModel.destroy()
     }
 
@@ -268,6 +270,7 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
 
     override fun showSidebar() {
         logger.d("showSidebar")
+        viewModel.requestClipboardSweep()
         sidebarView.showView()
         isShowingSidebar = true
         animateHideSideline()
@@ -389,7 +392,8 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
         handler.post {
             runCatching {
                 windowManager.addView(sideLineView, layoutParams)
-                viewModel.registerCallbacks()
+                viewModel.registerSidebarCallbacks()
+                viewModel.registerClipboardCallbacks()
                 isShowingSideline = true
             }.onFailure { e ->
                 logger.e("failed to add sideline view: ", e)
@@ -475,7 +479,7 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
         if (!isShowingSideline && !force) return
 
         logger.d("removeView")
-        viewModel.unregisterCallbacks()
+        viewModel.unregisterSidebarCallbacks()
 
         handler.post {
             runCatching {

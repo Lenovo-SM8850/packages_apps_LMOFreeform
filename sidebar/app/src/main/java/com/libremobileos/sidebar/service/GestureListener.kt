@@ -22,6 +22,7 @@ class GestureListener(private val callback: Callback) : MGestureManager.MGesture
 
     companion object {
         private const val TAG = "GestureListener"
+        private const val TOUCH_SLOP_PX = 24
     }
 
     override fun singleFingerSlipAction(
@@ -45,11 +46,17 @@ class GestureListener(private val callback: Callback) : MGestureManager.MGesture
             MotionEvent.ACTION_DOWN -> {
                 initialTouchX = event.rawX
                 initialTouchY = event.rawY
-
                 isLongPress = false
                 longPressHandler.postDelayed(longPressRunnable, 500)
             }
             MotionEvent.ACTION_MOVE -> {
+                if (!isLongPress) {
+                    val dx = event.rawX - initialTouchX
+                    val dy = event.rawY - initialTouchY
+                    if (dx * dx + dy * dy > TOUCH_SLOP_PX * TOUCH_SLOP_PX) {
+                        longPressHandler.removeCallbacks(longPressRunnable)
+                    }
+                }
                 if (isLongPress) {
                     callback.moveSideline((event.rawX - initialTouchX).toInt(), (event.rawY - initialTouchY).toInt(), event.rawX.toInt(), event.rawY.toInt())
                     initialTouchX = event.rawX
@@ -58,8 +65,11 @@ class GestureListener(private val callback: Callback) : MGestureManager.MGesture
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 longPressHandler.removeCallbacks(longPressRunnable)
+                val wasLongPress = isLongPress
                 isLongPress = false
-                callback.endMoveSideline()
+                if (wasLongPress) {
+                    callback.endMoveSideline()
+                }
             }
         }
     }

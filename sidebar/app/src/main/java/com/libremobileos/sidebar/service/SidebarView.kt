@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.os.Handler
+import android.os.Looper
 import android.os.UserHandle
 import android.view.DragEvent
 import android.view.MotionEvent
@@ -54,7 +55,7 @@ class SidebarView(
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private val layoutParams = LayoutParams()
     private val logger = Logger(TAG)
-    private val handler = Handler()
+    private val handler = Handler(Looper.getMainLooper())
 
     private val sharedPrefs by lazy {
         context.getSharedPreferences(SidebarApplication.CONFIG, Context.MODE_PRIVATE)
