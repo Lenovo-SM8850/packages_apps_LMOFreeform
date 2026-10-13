@@ -123,18 +123,18 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
         }
 
         if (!serviceStarted) {
-        logger.d("starting service for user $userId")
-        viewModel = ServiceViewModel(application)
-        windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        iActivityManager = IActivityManager.Stub.asInterface(ServiceManager.getService(Context.ACTIVITY_SERVICE))
-        screenWidth = resources.displayMetrics.widthPixels
-        screenHeight = resources.displayMetrics.heightPixels
-        sharedPrefs = application.applicationContext.getSharedPreferences(SidebarApplication.CONFIG, Context.MODE_PRIVATE)
-        sharedPrefs.registerOnSharedPreferenceChangeListener(this)
-        iActivityManager.registerUserSwitchObserver(userSwitchObserver, TAG)
-        
-        serviceStarted = true
-        
+            logger.d("starting service for user $userId")
+            viewModel = ServiceViewModel(application)
+            windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            iActivityManager = IActivityManager.Stub.asInterface(ServiceManager.getService(Context.ACTIVITY_SERVICE))
+            screenWidth = resources.displayMetrics.widthPixels
+            screenHeight = resources.displayMetrics.heightPixels
+            sharedPrefs = application.applicationContext.getSharedPreferences(SidebarApplication.CONFIG, Context.MODE_PRIVATE)
+            sharedPrefs.registerOnSharedPreferenceChangeListener(this)
+            iActivityManager.registerUserSwitchObserver(userSwitchObserver, TAG)
+
+            serviceStarted = true
+
             configureSidelineDragListener()
             viewModel.registerClipboardCallbacks()
         }
@@ -157,7 +157,7 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
         showSideline = sharedPrefs.getBoolean(SIDELINE, false)
         val autoEnabled = sharedPrefs.getBoolean(SidebarMonitorService.KEY_AUTO_ENABLED_TEMP, false)
         val shouldShow = showSideline || autoEnabled
-        
+
         logger.d("screenWidth=$screenWidth screenHeight=$screenHeight showSideline=$showSideline autoEnabled=$autoEnabled")
         if (shouldShow) showView()
         if (intent?.action == ACTION_IMPORT_TO_SMART_CLIPBOARD) {
@@ -180,7 +180,7 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
         val masterEnabled = sharedPrefs.getBoolean(SIDELINE, false)
         val autoEnabled = sharedPrefs.getBoolean(SidebarMonitorService.KEY_AUTO_ENABLED_TEMP, false)
         val shouldShow = masterEnabled || autoEnabled
-        
+
         if (shouldShow && isShowingSideline) {
             updateSidelinePosition()
         }
@@ -205,7 +205,7 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
                 showSideline = sharedPrefs.getBoolean(SIDELINE, false)
                 val autoEnabled = sharedPrefs.getBoolean(SidebarMonitorService.KEY_AUTO_ENABLED_TEMP, false)
                 val shouldShow = showSideline || autoEnabled
-                
+
                 if (shouldShow) {
                     showView()
                 } else {
@@ -216,7 +216,7 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
                 val masterEnabled = sharedPrefs.getBoolean(SIDELINE, false)
                 val autoEnabled = sharedPrefs.getBoolean(SidebarMonitorService.KEY_AUTO_ENABLED_TEMP, false)
                 val shouldShow = masterEnabled || autoEnabled
-                
+
                 if (shouldShow) {
                     showView()
                 } else {
@@ -263,9 +263,9 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
                 val masterEnabled = sharedPrefs.getBoolean(SIDELINE, false)
                 val autoEnabled = sharedPrefs.getBoolean(SidebarMonitorService.KEY_AUTO_ENABLED_TEMP, false)
                 val shouldShowService = masterEnabled || autoEnabled
-                
+
                 logger.d("onRemove - masterEnabled: $masterEnabled, autoEnabled: $autoEnabled, shouldShowService: $shouldShowService, isShowingSideline: $isShowingSideline")
-                
+
                 val hideOnGameSpace = sharedPrefs.getBoolean(SIDEBAR_HIDE_ON_GAMESPACE, false)
                 if (shouldShowService && isShowingSideline && !(isGameSpaceActive && hideOnGameSpace)) {
                     sideLineView.animate().cancel()
