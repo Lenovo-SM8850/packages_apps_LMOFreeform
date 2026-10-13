@@ -171,7 +171,32 @@ class SidebarView(
             false
         }
 
+        composeView.setOnDragListener { _, event ->
+            when (event.action) {
+                DragEvent.ACTION_DRAG_STARTED -> {
+                    viewModel.supportsSmartClipboardContent(event.clipDescription)
+                }
+                DragEvent.ACTION_DROP -> {
+                    if (!viewModel.supportsSmartClipboardContent(event.clipDescription)) {
+                        return@setOnDragListener false
+                    }
+                    viewModel.addClipDataToSmartClipboard(
+                        clipData = event.clipData,
+                        enableIfNeeded = true,
+                        showToast = true
+                    )
+                    true
+                }
+                DragEvent.ACTION_DRAG_ENTERED,
+                DragEvent.ACTION_DRAG_LOCATION,
+                DragEvent.ACTION_DRAG_EXITED,
+                DragEvent.ACTION_DRAG_ENDED -> true
+                else -> false
+            }
+        }
+
         handler.post {
+            if (isRemoved) return@post
             lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME) // this also emits ON_START
             runCatching {
                 windowManager.addView(composeView, layoutParams)

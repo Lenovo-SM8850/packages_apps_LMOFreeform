@@ -323,12 +323,17 @@ private fun SwipeToDeleteContainer(onDelete: () -> Unit, content: @Composable ()
 @Composable
 private fun ClipboardPreviewCard(item: SmartClipboardEntity, viewModel: ServiceViewModel, hostView: android.view.View) {
     val imageBitmap by produceState<ImageBitmap?>(null, item.imagePath, item.id) {
+        value = if (item.type == SmartClipboardEntity.TYPE_IMAGE) {
+            item.imagePath?.let { path -> viewModel.loadPreviewBitmap(path, 320, 180) }
+        } else null
+    }
+    val fileExists by produceState<Boolean?>(null, item.imagePath, item.id) {
         value = item.imagePath?.let { path ->
-            viewModel.loadPreviewBitmap(path, 320, 180)
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { java.io.File(path).exists() }
         }
     }
-    val isFileMissing = (item.type == SmartClipboardEntity.TYPE_IMAGE || item.type == SmartClipboardEntity.TYPE_FILE) && item.imagePath != null && imageBitmap == null
-    if (isFileMissing && item.imagePath != null) {
+    val isFileMissing = fileExists == false
+    if (isFileMissing) {
         LaunchedEffect(item.id, item.imagePath) {
             kotlinx.coroutines.delay(500)
             viewModel.deleteMissingPreview(item)
