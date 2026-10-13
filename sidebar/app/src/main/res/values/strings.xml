@@ -83,4 +83,5 @@
     <string name="smart_clipboard_cancel">Cancel</string>
     <string name="smart_clipboard_clear">Clear</string>
     <string name="smart_clipboard_missing_file">File missing</string>
+    <string name="floating_window_unavailable">This app cannot open in a floating window</string>
 </resources>
