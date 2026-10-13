@@ -1,6 +1,8 @@
 package com.libremobileos.sidebar.service
 
 import android.annotation.SuppressLint
+import android.app.ActivityOptions
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -14,6 +16,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.WindowManager.LayoutParams
+import android.widget.Toast
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -28,10 +31,12 @@ import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.libremobileos.sidebar.R
 import com.libremobileos.sidebar.app.SidebarApplication
 import com.libremobileos.sidebar.bean.AppInfo
 import com.libremobileos.sidebar.ui.theme.SidebarTheme
 import com.libremobileos.sidebar.utils.Logger
+import com.libremobileos.sidebar.utils.canLaunchInFloatingWindow
 import kotlin.math.roundToInt
 
 /**
@@ -66,8 +71,6 @@ class SidebarView(
 
     companion object {
         private const val OFFSET_X = 90
-        private const val PACKAGE = "com.libremobileos.freeform"
-        private const val ACTION = "com.libremobileos.freeform.START_FREEFORM"
         private const val TAG = "SidebarView"
     }
 
@@ -117,7 +120,7 @@ class SidebarView(
                 SidebarTheme {
                     SidebarComposeView(
                         viewModel = viewModel,
-                        launchApp = { launchAppInFreeform(it) },
+                        launchApp = { launchAppInFloatingWindow(it) },
                         closeSidebar = { removeView() },
                         modifier = Modifier
                             .fillMaxHeight()
@@ -135,14 +138,25 @@ class SidebarView(
         }
     }
 
-    private fun launchAppInFreeform(appInfo: AppInfo) {
-        val intent = Intent(ACTION).apply {
-            setPackage(PACKAGE)
-            putExtra("packageName", appInfo.packageName)
-            putExtra("activityName", appInfo.activityName)
-            putExtra("userId", appInfo.userId)
+    private fun launchAppInFloatingWindow(appInfo: AppInfo) {
+        val componentName = ComponentName(appInfo.packageName, appInfo.activityName)
+        if (!context.canLaunchInFloatingWindow(componentName, appInfo.userId)) {
+            Toast.makeText(context, R.string.floating_window_unavailable, Toast.LENGTH_SHORT).show()
+            return
         }
-        context.sendBroadcastAsUser(intent, UserHandle(UserHandle.USER_CURRENT))
+        val intent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            component = componentName
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        val options = ActivityOptions.makeBasic().apply {
+            setLaunchFloatingWindow(true)
+        }
+        runCatching {
+            context.startActivityAsUser(intent, options.toBundle(), UserHandle.of(appInfo.userId))
+        }.onFailure {
+            logger.e("startApp failed", it)
+        }
         removeView()
     }
 
