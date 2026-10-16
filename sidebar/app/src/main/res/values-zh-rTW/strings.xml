@@ -6,7 +6,7 @@
     <string name="sidebar_label">側邊欄 </string>
     <string name="sidebar_summary">快速開啟小窗化應用程式</string>
     <string name="sidebar_app_setting_label">固定的應用</string>
-    <string name="sidebar_settings_description">打開側邊欄設定</string>
+    <string name="sidebar_settings_description">開啟側邊欄設定</string>
     <string name="sidebar_predicted_apps">顯示應用程式建議</string>
     <string name="sidebar_predicted_apps_summary">在固定的應用下方顯示至多6個建議應用</string>
     <string name="sidebar_auto_enable_selected_apps">對選擇的應用程式自動啟用側邊欄</string>
@@ -19,12 +19,12 @@
     <string name="sidebar_section_slider">滑桿設定</string>
     <string name="sidebar_section_layout">佈局設定</string>
     <string name="sidebar_section_visual">視覺效果</string>
-    <string name="sidebar_section_miscellaneous">Miscellaneous</string>
+    <string name="sidebar_section_miscellaneous">其他</string>
     <!-- Slider settings -->
-    <string name="sidebar_transparency_value">Slider transparency: %1$.2f</string>
-    <string name="sidebar_length_value">Slider length: %1$d</string>
-    <string name="sidebar_width_value">Slider width: %1$d</string>
-    <string name="sidebar_position_label">Slider position</string>
+    <string name="sidebar_transparency_value">滑桿透明度：%1$.2f</string>
+    <string name="sidebar_length_value">滑桿長度：%1$d</string>
+    <string name="sidebar_width_value">滑桿寬度：%1$d</string>
+    <string name="sidebar_position_label">滑桿位置</string>
     <string name="sidebar_left">螢幕左側</string>
     <string name="sidebar_right">螢幕右側</string>
     <!-- Layout settings -->
@@ -41,12 +41,45 @@
     <string name="sidebar_reset_defaults">重設為預設設定</string>
     <!-- Visual effects -->
     <string name="sidebar_drop_shadow_title">陰影</string>
-    <string name="sidebar_drop_shadow_summary">為側邊欄添加陰影效果</string>
+    <string name="sidebar_drop_shadow_summary">為側邊欄新增陰影效果</string>
     <!-- Miscellaneous -->
-    <string name="sidebar_tap_to_open_title">Open drawer on tap</string>
-    <string name="sidebar_tap_to_open_summary">Open the sidebar drawer when the slider is tapped</string>
-    <string name="sidebar_swipe_to_open_title">Open drawer on swipe</string>
-    <string name="sidebar_swipe_to_open_summary">Open the sidebar drawer when the slider is swiped horizontally</string>
-    <string name="sidebar_hide_on_gamespace_title">Hide when GameSpace is active</string>
-    <string name="sidebar_hide_on_gamespace_summary">Automatically hide the sidebar slider when a game is running with GameSpace</string>
+    <string name="sidebar_tap_to_open_title">輕觸時開啟抽屜</string>
+    <string name="sidebar_tap_to_open_summary">輕觸滑桿時開啟側邊欄抽屜</string>
+    <string name="sidebar_swipe_to_open_title">滑動時開啟抽屜</string>
+    <string name="sidebar_swipe_to_open_summary">水平滑動滑桿時開啟側邊欄抽屜</string>
+    <string name="sidebar_hide_on_gamespace_title">遊戲空間啟用時隱藏</string>
+    <string name="sidebar_hide_on_gamespace_summary">使用遊戲空間執行遊戲時，自動隱藏側邊欄滑桿</string>
+    <string name="smart_clipboard_label">智慧剪貼簿</string>
+    <string name="smart_clipboard_receiver_label">側邊欄</string>
+    <string name="smart_clipboard_summary">將複製、分享和拖放的文字或圖片儲存在側邊欄中，方便快速再次使用。</string>
+    <string name="smart_clipboard_expiration_label">保留時間</string>
+    <string name="smart_clipboard_expiration_15_min">15 分鐘</string>
+    <string name="smart_clipboard_expiration_1_hour">1 小時</string>
+    <string name="smart_clipboard_expiration_1_day">1 天</string>
+    <string name="smart_clipboard_expiration_1_week">1 週</string>
+    <string name="smart_clipboard_expiration_forever">永久</string>
+    <string name="smart_clipboard_empty">在此複製、分享或拖入文字和圖片，即可儲存在側邊欄中。</string>
+    <string name="smart_clipboard_image">圖片</string>
+    <string name="smart_clipboard_copy">再次複製</string>
+    <string name="smart_clipboard_share">分享</string>
+    <string name="smart_clipboard_delete">刪除</string>
+    <string name="smart_clipboard_unpin">取消固定</string>
+    <string name="smart_clipboard_copy_description">再次複製剪貼簿項目</string>
+    <string name="smart_clipboard_share_description">分享剪貼簿項目</string>
+    <string name="smart_clipboard_delete_description">刪除剪貼簿項目</string>
+    <string name="smart_clipboard_pin_description">固定剪貼簿項目</string>
+    <string name="smart_clipboard_unpin_description">取消固定剪貼簿項目</string>
+    <string name="smart_clipboard_image_description">剪貼簿圖片預覽</string>
+    <string name="smart_clipboard_text_description">剪貼簿文字項目</string>
+    <string name="smart_clipboard_file_description">剪貼簿檔案項目</string>
+    <string name="smart_clipboard_saved">已儲存至智慧剪貼簿</string>
+    <string name="smart_clipboard_unsupported">不支援的內容類型</string>
+    <string name="smart_clipboard_file_too_large">檔案過大，無法儲存（上限 100MB）</string>
+    <string name="smart_clipboard_enabled">智慧剪貼簿已啟用</string>
+    <string name="smart_clipboard_clear_history">立即清除記錄</string>
+    <string name="smart_clipboard_clear_title">清除剪貼簿</string>
+    <string name="smart_clipboard_clear_message">確定要清除未固定的剪貼簿記錄嗎？</string>
+    <string name="smart_clipboard_cancel">取消</string>
+    <string name="smart_clipboard_clear">清除</string>
+    <string name="smart_clipboard_missing_file">檔案遺失</string>
 </resources>
