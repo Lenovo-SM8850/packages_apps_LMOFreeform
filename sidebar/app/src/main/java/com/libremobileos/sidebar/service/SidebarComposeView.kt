@@ -20,10 +20,19 @@ import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.android.settingslib.spa.framework.compose.rememberDrawablePainter
 import com.libremobileos.sidebar.R
@@ -61,7 +70,57 @@ import androidx.compose.ui.unit.sp
 import com.libremobileos.sidebar.room.SmartClipboardEntity
 import kotlin.math.roundToInt
 
+// Room around the card for the shadow, which must stay inside the overlay window bounds
 private val SHADOW_INSET = 12.dp
+private val SHADOW_REACH = 10.dp
+private val SHADOW_OFFSET_Y = 2.dp
+private const val SHADOW_STEPS = 10
+private const val SHADOW_ALPHA = 0.25f
+
+private fun RoundRect.grow(delta: Float): RoundRect {
+    fun CornerRadius.grow() = CornerRadius(x + delta, y + delta)
+    return RoundRect(
+        left = left - delta,
+        top = top - delta,
+        right = right + delta,
+        bottom = bottom + delta,
+        topLeftCornerRadius = topLeftCornerRadius.grow(),
+        topRightCornerRadius = topRightCornerRadius.grow(),
+        bottomRightCornerRadius = bottomRightCornerRadius.grow(),
+        bottomLeftCornerRadius = bottomLeftCornerRadius.grow()
+    )
+}
+
+/**
+ * Draws a soft shadow around a rounded card without using elevation shadows.
+ *
+ * An elevation shadow is cast with the translucent card as its occluder, so it also shows through
+ * the card and is filled over the whole window as a rectangle. This shadow is a stack of growing
+ * rounded rectangles that is clipped out of the card shape, so it exists only outside the card.
+ */
+private fun Modifier.panelShadow(cornerRadius: Dp): Modifier = drawBehind {
+    val outline = RoundedCornerShape(cornerRadius).createOutline(size, layoutDirection, this)
+    val card = when (outline) {
+        is Outline.Rounded -> outline.roundRect
+        is Outline.Rectangle -> RoundRect(outline.rect)
+        is Outline.Generic -> RoundRect(0f, 0f, size.width, size.height, 0f, 0f)
+    }
+    val cardPath = Path().apply { addRoundRect(card) }
+    val reach = SHADOW_REACH.toPx()
+    clipPath(cardPath, ClipOp.Difference) {
+        translate(top = SHADOW_OFFSET_Y.toPx()) {
+            for (i in 0 until SHADOW_STEPS) {
+                // Each step adds the difference of a quadratic falloff, so the sum fades smoothly
+                val near = 1f - i / SHADOW_STEPS.toFloat()
+                val far = 1f - (i + 1) / SHADOW_STEPS.toFloat()
+                val layer = Path().apply {
+                    addRoundRect(card.grow(reach * (i + 1) / SHADOW_STEPS))
+                }
+                drawPath(layer, Color.Black.copy(alpha = SHADOW_ALPHA * (near * near - far * far)))
+            }
+        }
+    }
+}
 
 @Composable
 private fun SidebarAppContent(
@@ -94,11 +153,8 @@ private fun SidebarAppContent(
     var cardModifier = modifier
     
     if (showShadow) {
-        // Leave room around the card, otherwise the window bounds clip the shadow into a rectangle
-        cardModifier = cardModifier.padding(SHADOW_INSET).shadow(
-            elevation = 8.dp,
-            shape = RoundedCornerShape(cornerRadius.dp)
-        )
+        // Leave room around the card so the window bounds do not cut the shadow off
+        cardModifier = cardModifier.padding(SHADOW_INSET).panelShadow(cornerRadius.dp)
     }
 
     Card(
