@@ -61,6 +61,8 @@ import androidx.compose.ui.unit.sp
 import com.libremobileos.sidebar.room.SmartClipboardEntity
 import kotlin.math.roundToInt
 
+private val SHADOW_INSET = 12.dp
+
 @Composable
 private fun SidebarAppContent(
     viewModel: ServiceViewModel,
@@ -92,7 +94,8 @@ private fun SidebarAppContent(
     var cardModifier = modifier
     
     if (showShadow) {
-        cardModifier = cardModifier.shadow(
+        // Leave room around the card, otherwise the window bounds clip the shadow into a rectangle
+        cardModifier = cardModifier.padding(SHADOW_INSET).shadow(
             elevation = 8.dp,
             shape = RoundedCornerShape(cornerRadius.dp)
         )
