@@ -129,6 +129,9 @@ class SidebarView(
                 }
             }
         }.apply {
+            // The root is focusable to receive back and outside touches. Without this, the default
+            // focus highlight paints a translucent rectangle over the whole window when it has focus
+            defaultFocusHighlightEnabled = false
             setViewTreeLifecycleOwner(this@SidebarView)
             setViewTreeSavedStateRegistryOwner(this@SidebarView)
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
