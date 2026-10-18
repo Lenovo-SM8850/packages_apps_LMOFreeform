@@ -20,7 +20,14 @@ import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.shadow.DropShadowPainter
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -76,9 +83,6 @@ private fun SidebarAppContent(
     val iconSize = sharedPrefs.getInt("sidebar_icon_size", 40)
     val iconPadding = sharedPrefs.getInt("sidebar_icon_padding", 7)
     val columnSpacing = sharedPrefs.getInt("sidebar_column_spacing", 4)
-    val cornerRadius = sharedPrefs.getFloat("sidebar_corner_radius", 24f)
-    val backgroundTransparency = sharedPrefs.getFloat("sidebar_background_transparency", 0.80f)
-    val showShadow = sharedPrefs.getBoolean("sidebar_show_shadow", true)
     
     val sidebarAppList by viewModel.sidebarAppListFlow.collectAsState()
     
@@ -89,24 +93,7 @@ private fun SidebarAppContent(
         add(SidebarItem.Settings)
     }
     
-    var cardModifier = modifier
-    
-    if (showShadow) {
-        cardModifier = cardModifier.shadow(
-            elevation = 8.dp,
-            shape = RoundedCornerShape(cornerRadius.dp)
-        )
-    }
-
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(
-                alpha = backgroundTransparency
-            )
-        ),
-        shape = RoundedCornerShape(cornerRadius.dp),
-        modifier = cardModifier
-    ) {
+    Column(modifier = modifier) {
         if (columnCount == 1) {
             // Single column
             LazyColumn(
@@ -223,30 +210,32 @@ fun SidebarComposeView(
     var clipboardSelected by remember { mutableStateOf(false) }
     var showClearDialog by remember { mutableStateOf(false) }
     val hostView = LocalView.current
-    if (!enabled) {
-        SidebarAppContent(viewModel, launchApp, closeSidebar, modifier)
-        return
-    }
-    Column(modifier = modifier.widthIn(min = 240.dp, max = 360.dp)) {
-        Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
-            IconButton(onClick = { clipboardSelected = false }) {
-                Icon(Icons.Default.Apps, stringResource(R.string.sidebar_app_setting_label))
-            }
-            IconButton(onClick = { clipboardSelected = true }) {
-                Icon(Icons.Default.ContentPaste, stringResource(R.string.smart_clipboard_label))
-            }
-            if (clipboardSelected) {
-                IconButton(onClick = { showClearDialog = true }) {
-                    Icon(painterResource(R.drawable.smart_clipboard_delete_24), stringResource(R.string.smart_clipboard_clear_history))
+    SidebarPanel(modifier) {
+        if (!enabled) {
+            SidebarAppContent(viewModel, launchApp, closeSidebar, Modifier.fillMaxHeight())
+        } else {
+            Column(modifier = Modifier.widthIn(min = 240.dp, max = 360.dp)) {
+                Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
+                    IconButton(onClick = { clipboardSelected = false }) {
+                        Icon(Icons.Default.Apps, stringResource(R.string.sidebar_app_setting_label))
+                    }
+                    IconButton(onClick = { clipboardSelected = true }) {
+                        Icon(Icons.Default.ContentPaste, stringResource(R.string.smart_clipboard_label))
+                    }
+                    if (clipboardSelected) {
+                        IconButton(onClick = { showClearDialog = true }) {
+                            Icon(painterResource(R.drawable.smart_clipboard_delete_24), stringResource(R.string.smart_clipboard_clear_history))
+                        }
+                    }
+                }
+                if (clipboardSelected) {
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        ClipboardListContent(items, viewModel, hostView)
+                    }
+                } else {
+                    SidebarAppContent(viewModel, launchApp, closeSidebar, Modifier.weight(1f))
                 }
             }
-        }
-        if (clipboardSelected) {
-            Card(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                ClipboardListContent(items, viewModel, hostView)
-            }
-        } else {
-            SidebarAppContent(viewModel, launchApp, closeSidebar, Modifier.weight(1f))
         }
     }
     if (showClearDialog) {
@@ -262,6 +251,47 @@ fun SidebarComposeView(
             dismissButton = {
                 TextButton(onClick = { showClearDialog = false }) { Text(stringResource(R.string.smart_clipboard_cancel)) }
             }
+        )
+    }
+}
+
+@Composable
+private fun SidebarPanel(modifier: Modifier, content: @Composable ColumnScope.() -> Unit) {
+    val context = LocalContext.current
+    val sharedPrefs = context.getSharedPreferences(SidebarApplication.CONFIG, Context.MODE_PRIVATE)
+    val shape = RoundedCornerShape(sharedPrefs.getFloat("sidebar_corner_radius", 24f).dp)
+    val backgroundTransparency = sharedPrefs.getFloat("sidebar_background_transparency", 0.80f)
+    val showShadow = sharedPrefs.getBoolean("sidebar_show_shadow", true)
+    val panelModifier = if (showShadow) {
+        Modifier.drawWithCache {
+            val outline = Path().apply {
+                addOutline(shape.createOutline(size, layoutDirection, this@drawWithCache))
+            }
+            val shadow = DropShadowPainter(
+                shape,
+                Shadow(radius = 8.dp, color = Color.Black.copy(alpha = 0.24f))
+            )
+            onDrawWithContent {
+                // Elevation shadows assume an opaque caster and show through a translucent surface.
+                clipPath(outline, ClipOp.Difference) {
+                    with(shadow) { draw(size) }
+                }
+                drawContent()
+            }
+        }
+    } else {
+        Modifier
+    }
+    // Keep the soft shadow inside the overlay buffer on every edge.
+    Box(modifier = modifier.padding(16.dp)) {
+        Card(
+            modifier = panelModifier.fillMaxHeight(),
+            shape = shape,
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = backgroundTransparency)
+            ),
+            content = content
         )
     }
 }
