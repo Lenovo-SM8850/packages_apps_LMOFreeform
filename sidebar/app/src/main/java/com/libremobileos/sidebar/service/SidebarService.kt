@@ -10,12 +10,15 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.res.Configuration
+import android.database.ContentObserver
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.ServiceManager
 import android.os.UserHandle
+import android.provider.Settings
 import android.view.DragEvent
 import android.view.View
 import android.view.WindowManager
@@ -71,6 +74,13 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
 
     private var isGameSpaceActive = false
 
+    // Game Space shows its own handle with quick launch while a game session runs
+    private val gamingModeObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) {
+            updateGameSpaceActive()
+        }
+    }
+
     private val isPortrait: Boolean
         get() = resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
 
@@ -99,6 +109,7 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
         const val SIDEBAR_TAP_TO_OPEN = "sidebar_tap_to_open"
         const val SIDEBAR_SWIPE_TO_OPEN = "sidebar_swipe_to_open"
         const val SIDEBAR_HIDE_ON_GAMESPACE = "sidebar_hide_on_gamespace"
+        private const val GAMING_MODE_ACTIVE = "ax_gaming_mode_active"
         const val ACTION_GAME_START = "io.chaldeaprjkt.gamespace.action.GAME_START"
         const val ACTION_GAME_STOP = "io.chaldeaprjkt.gamespace.action.GAME_STOP"
 
@@ -132,6 +143,9 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
             sharedPrefs = application.applicationContext.getSharedPreferences(SidebarApplication.CONFIG, Context.MODE_PRIVATE)
             sharedPrefs.registerOnSharedPreferenceChangeListener(this)
             iActivityManager.registerUserSwitchObserver(userSwitchObserver, TAG)
+            contentResolver.registerContentObserver(
+                Settings.Secure.getUriFor(GAMING_MODE_ACTIVE), false, gamingModeObserver)
+            isGameSpaceActive = isGamingModeActive()
 
             serviceStarted = true
 
@@ -194,6 +208,7 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
         if (!serviceStarted) return
         sharedPrefs.unregisterOnSharedPreferenceChangeListener(this)
         iActivityManager.unregisterUserSwitchObserver(userSwitchObserver)
+        contentResolver.unregisterContentObserver(gamingModeObserver)
         removeView()
         viewModel.unregisterClipboardCallbacks()
         viewModel.destroy()
@@ -483,6 +498,17 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
             }
         }
         sidebarView?.removeView()
+    }
+
+    private fun isGamingModeActive() =
+        Settings.Secure.getInt(contentResolver, GAMING_MODE_ACTIVE, 0) == 1
+
+    private fun updateGameSpaceActive() {
+        val active = isGamingModeActive()
+        if (active == isGameSpaceActive) return
+        logger.d("updateGameSpaceActive: $active")
+        isGameSpaceActive = active
+        updateSidebarVisibility()
     }
 
     private fun updateSidebarVisibility() {
