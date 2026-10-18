@@ -44,7 +44,6 @@ fun SidebarCustomizationSettingsPage(
     var showShadow by remember { mutableStateOf(sharedPrefs.getBoolean("sidebar_show_shadow", true)) }
     var tapToOpen by remember { mutableStateOf(sharedPrefs.getBoolean("sidebar_tap_to_open", false)) }
     var swipeToOpen by remember { mutableStateOf(sharedPrefs.getBoolean("sidebar_swipe_to_open", true)) }
-    var hideOnGameSpace by remember { mutableStateOf(sharedPrefs.getBoolean("sidebar_hide_on_gamespace", false)) }
 
     CompositionLocalProvider(LocalNavController provides remember {
         object : NavControllerWrapper {
@@ -409,32 +408,6 @@ fun SidebarCustomizationSettingsPage(
                                     )
                                 }
                             }
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            // Hide on GameSpace Toggle
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Switch(
-                                    checked = hideOnGameSpace,
-                                    onCheckedChange = { 
-                                        hideOnGameSpace = it
-                                        sharedPrefs.edit().putBoolean("sidebar_hide_on_gamespace", hideOnGameSpace).apply()
-                                        onSettingChanged()
-                                    }
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text(text = stringResource(R.string.sidebar_hide_on_gamespace_title))
-                                    Text(
-                                        text = stringResource(R.string.sidebar_hide_on_gamespace_summary),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
                         }
                     }
                 }
@@ -457,7 +430,6 @@ fun SidebarCustomizationSettingsPage(
                             showShadow = true
                             tapToOpen = false
                             swipeToOpen = true
-                            hideOnGameSpace = false
                             
                             sharedPrefs.edit()
                                 .putFloat("slider_transparency", transparency)
@@ -473,7 +445,6 @@ fun SidebarCustomizationSettingsPage(
                                 .putBoolean("sidebar_show_shadow", showShadow)
                                 .putBoolean("sidebar_tap_to_open", tapToOpen)
                                 .putBoolean("sidebar_swipe_to_open", swipeToOpen)
-                                .putBoolean("sidebar_hide_on_gamespace", hideOnGameSpace)
                                 .apply()
                             onSettingChanged()
                         },
