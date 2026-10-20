@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.text.format.DateUtils
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -37,7 +38,10 @@ import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -48,6 +52,7 @@ import com.libremobileos.sidebar.R
 import com.libremobileos.sidebar.app.SidebarApplication
 import com.libremobileos.sidebar.bean.AppInfo
 import com.libremobileos.sidebar.room.SmartClipboardEntity
+import kotlin.math.roundToInt
 
 private val SHADOW_RADIUS = 8.dp
 
@@ -55,6 +60,7 @@ private val SHADOW_RADIUS = 8.dp
 fun SidebarComposeView(
     viewModel: ServiceViewModel,
     launchApp: (AppInfo) -> Unit,
+    dragApp: (AppInfo, Int, android.graphics.Rect) -> Unit,
     closeSidebar: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -132,6 +138,7 @@ fun SidebarComposeView(
                         iconPadding = iconPadding,
                         viewModel = viewModel,
                         launchApp = launchApp,
+                        dragApp = dragApp,
                         closeSidebar = closeSidebar
                     )
                 }
@@ -161,6 +168,7 @@ fun SidebarComposeView(
                         iconPadding = iconPadding,
                         viewModel = viewModel,
                         launchApp = launchApp,
+                        dragApp = dragApp,
                         closeSidebar = closeSidebar
                     )
                 }
@@ -217,8 +225,12 @@ private fun SidebarItemView(
     iconPadding: Int,
     viewModel: ServiceViewModel,
     launchApp: (AppInfo) -> Unit,
+    dragApp: (AppInfo, Int, android.graphics.Rect) -> Unit,
     closeSidebar: () -> Unit
 ) {
+    val host = LocalView.current
+    var dragBounds by remember { mutableStateOf(android.graphics.Rect()) }
+    val iconSizePx = with(LocalDensity.current) { iconSize.dp.roundToPx() }
     Box(
         modifier = Modifier.padding(iconPadding.dp),
         contentAlignment = Alignment.Center
@@ -242,9 +254,18 @@ private fun SidebarItemView(
                     contentDescription = item.appInfo.label,
                     modifier = Modifier
                         .size(iconSize.dp)
-                        .clickable {
-                            launchApp(item.appInfo)
+                        .onGloballyPositioned { coordinates ->
+                            val position = IntArray(2)
+                            host.getLocationOnScreen(position)
+                            val bounds = coordinates.boundsInRoot()
+                            dragBounds = android.graphics.Rect(
+                                position[0] + bounds.left.roundToInt(), position[1] + bounds.top.roundToInt(),
+                                position[0] + bounds.right.roundToInt(), position[1] + bounds.bottom.roundToInt())
                         }
+                        .combinedClickable(
+                            onClick = { launchApp(item.appInfo) },
+                            onLongClick = { dragApp(item.appInfo, iconSizePx, dragBounds) }
+                        )
                 )
             }
             is SidebarItem.Settings -> {

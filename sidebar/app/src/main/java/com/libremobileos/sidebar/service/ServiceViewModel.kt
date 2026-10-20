@@ -1,5 +1,6 @@
 package com.libremobileos.sidebar.service
 
+import com.android.wm.shell.shared.draganddrop.DragAndDropConstants.EXTRA_SIDEBAR_APP_DRAG
 import android.app.Application
 import android.app.prediction.AppPredictionContext
 import android.app.prediction.AppPredictionManager
@@ -526,6 +527,8 @@ class ServiceViewModel(private val application: Application): AndroidViewModel(a
 
     fun supportsSmartClipboardContent(description: ClipDescription?): Boolean {
         if (description == null) return false
+        // The sidebar's own app drag is a launch request, not clipboard content
+        if (description.extras?.getBoolean(EXTRA_SIDEBAR_APP_DRAG) == true) return false
         return description.hasMimeType("image/*") ||
             description.hasMimeType("text/*") ||
             description.hasMimeType("application/*") ||
