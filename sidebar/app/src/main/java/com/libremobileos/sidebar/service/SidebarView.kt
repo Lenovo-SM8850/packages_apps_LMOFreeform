@@ -1,6 +1,13 @@
 package com.libremobileos.sidebar.service
 
 import android.annotation.SuppressLint
+import android.app.PendingIntent
+import android.content.ClipData
+import android.content.ClipDescription
+import android.graphics.Canvas
+import android.graphics.Point
+import android.os.PersistableBundle
+import com.android.wm.shell.shared.draganddrop.DragAndDropConstants.EXTRA_SIDEBAR_APP_DRAG
 import android.app.ActivityOptions
 import android.content.ComponentName
 import android.content.Context
@@ -60,6 +67,7 @@ class SidebarView(
     private var sidebarPositionY = 0
     private var isShowing = false
     private var isRemoved = false
+    private var appDragInProgress = false
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private val layoutParams = LayoutParams()
     private val logger = Logger(TAG)
@@ -104,6 +112,15 @@ class SidebarView(
                 super.onDetachedFromWindow()
             }
 
+            override fun dispatchDragEvent(event: DragEvent): Boolean {
+                val handled = super.dispatchDragEvent(event)
+                if (event.action == DragEvent.ACTION_DRAG_ENDED && appDragInProgress) {
+                    appDragInProgress = false
+                    removeView()
+                }
+                return handled
+            }
+
             override fun dispatchKeyEvent(event: KeyEvent): Boolean {
                 if (event.keyCode == KeyEvent.KEYCODE_BACK) {
                     if (event.action == KeyEvent.ACTION_UP) {
@@ -121,6 +138,7 @@ class SidebarView(
                     SidebarComposeView(
                         viewModel = viewModel,
                         launchApp = { launchAppInFloatingWindow(it) },
+                        dragApp = { app, size -> startAppDrag(app, size) },
                         closeSidebar = { removeView() },
                         modifier = Modifier
                             .fillMaxHeight()
@@ -160,6 +178,64 @@ class SidebarView(
         removeView()
     }
 
+    private fun startAppDrag(appInfo: AppInfo, iconSize: Int) {
+        if (appDragInProgress || isRemoved) return
+        val componentName = ComponentName(appInfo.packageName, appInfo.activityName)
+        if (!context.canLaunchInFloatingWindow(componentName, appInfo.userId)) {
+            Toast.makeText(context, R.string.floating_window_unavailable, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val user = UserHandle.of(appInfo.userId)
+        val launchIntent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            component = componentName
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        val pendingIntent = PendingIntent.getActivityAsUser(
+            context, 0, launchIntent, PendingIntent.FLAG_IMMUTABLE, null, user
+        )
+        val description = ClipDescription(
+            appInfo.label, arrayOf(ClipDescription.MIMETYPE_APPLICATION_ACTIVITY)
+        ).apply {
+            extras = PersistableBundle().apply { putBoolean(EXTRA_SIDEBAR_APP_DRAG, true) }
+        }
+        val data = ClipData(description, ClipData.Item(Intent().apply {
+            putExtra(ClipDescription.EXTRA_PENDING_INTENT, pendingIntent)
+            putExtra(Intent.EXTRA_USER, user)
+        }))
+        val icon = appInfo.icon.constantState?.newDrawable()?.mutate() ?: appInfo.icon
+        val shadow = object : View.DragShadowBuilder() {
+            override fun onProvideShadowMetrics(size: Point, touch: Point) {
+                size.set(iconSize, iconSize)
+                touch.set(iconSize / 2, iconSize)
+            }
+            override fun onDrawShadow(canvas: Canvas) {
+                val oldBounds = android.graphics.Rect(icon.bounds)
+                icon.setBounds(0, 0, iconSize, iconSize)
+                icon.draw(canvas)
+                icon.bounds = oldBounds
+            }
+        }
+        appDragInProgress = true
+        val started = runCatching {
+            composeView.startDragAndDrop(data, shadow, this, View.DRAG_FLAG_GLOBAL)
+        }.onFailure { logger.e("startApp drag failed", it) }.getOrDefault(false)
+        if (!started) {
+            appDragInProgress = false
+            return
+        }
+        hideForAppDrag()
+    }
+
+    private fun hideForAppDrag() {
+        // Keep the source window attached until it receives DRAG_ENDED.
+        composeView.animate().cancel()
+        composeView.alpha = 0f
+        layoutParams.flags = layoutParams.flags or LayoutParams.FLAG_NOT_TOUCHABLE or
+                LayoutParams.FLAG_NOT_FOCUSABLE
+        windowManager.updateViewLayout(composeView, layoutParams)
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     fun showView() {
         if (isShowing || isRemoved) return
@@ -191,7 +267,7 @@ class SidebarView(
         composeView.setOnDragListener { _, event ->
             when (event.action) {
                 DragEvent.ACTION_DRAG_STARTED -> {
-                    viewModel.supportsSmartClipboardContent(event.clipDescription)
+                    appDragInProgress || viewModel.supportsSmartClipboardContent(event.clipDescription)
                 }
                 DragEvent.ACTION_DROP -> {
                     if (!viewModel.supportsSmartClipboardContent(event.clipDescription)) {
@@ -227,6 +303,10 @@ class SidebarView(
 
     fun removeView() {
         if (isRemoved) return
+        if (appDragInProgress) {
+            hideForAppDrag()
+            return
+        }
 
         logger.d("removeView")
         isRemoved = true
