@@ -2,6 +2,7 @@ package com.libremobileos.sidebar.service
 
 import android.content.Context
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -72,6 +73,7 @@ import kotlin.math.roundToInt
 private fun SidebarAppContent(
     viewModel: ServiceViewModel,
     launchApp: (AppInfo) -> Unit,
+    dragApp: (AppInfo, Int, android.graphics.Rect) -> Unit,
     closeSidebar: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -106,6 +108,7 @@ private fun SidebarAppContent(
                         iconPadding = iconPadding,
                         viewModel = viewModel,
                         launchApp = launchApp,
+                        dragApp = dragApp,
                         closeSidebar = closeSidebar
                     )
                 }
@@ -130,6 +133,7 @@ private fun SidebarAppContent(
                         iconPadding = iconPadding,
                         viewModel = viewModel,
                         launchApp = launchApp,
+                        dragApp = dragApp,
                         closeSidebar = closeSidebar
                     )
                 }
@@ -145,8 +149,12 @@ private fun SidebarItemView(
     iconPadding: Int,
     viewModel: ServiceViewModel,
     launchApp: (AppInfo) -> Unit,
+    dragApp: (AppInfo, Int, android.graphics.Rect) -> Unit,
     closeSidebar: () -> Unit
 ) {
+    val host = LocalView.current
+    var dragBounds by remember { mutableStateOf(android.graphics.Rect()) }
+    val iconSizePx = with(LocalDensity.current) { iconSize.dp.roundToPx() }
     Box(
         modifier = Modifier.padding(iconPadding.dp),
         contentAlignment = Alignment.Center
@@ -170,9 +178,18 @@ private fun SidebarItemView(
                     contentDescription = item.appInfo.label,
                     modifier = Modifier
                         .size(iconSize.dp)
-                        .clickable {
-                            launchApp(item.appInfo)
+                        .onGloballyPositioned { coordinates ->
+                            val position = IntArray(2)
+                            host.getLocationOnScreen(position)
+                            val bounds = coordinates.boundsInRoot()
+                            dragBounds = android.graphics.Rect(
+                                position[0] + bounds.left.roundToInt(), position[1] + bounds.top.roundToInt(),
+                                position[0] + bounds.right.roundToInt(), position[1] + bounds.bottom.roundToInt())
                         }
+                        .combinedClickable(
+                            onClick = { launchApp(item.appInfo) },
+                            onLongClick = { dragApp(item.appInfo, iconSizePx, dragBounds) }
+                        )
                 )
             }
             is SidebarItem.Settings -> {
@@ -202,6 +219,7 @@ private sealed class SidebarItem {
 fun SidebarComposeView(
     viewModel: ServiceViewModel,
     launchApp: (AppInfo) -> Unit,
+    dragApp: (AppInfo, Int, android.graphics.Rect) -> Unit,
     closeSidebar: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -212,7 +230,7 @@ fun SidebarComposeView(
     val hostView = LocalView.current
     SidebarPanel(modifier) {
         if (!enabled) {
-            SidebarAppContent(viewModel, launchApp, closeSidebar, Modifier.fillMaxHeight())
+            SidebarAppContent(viewModel, launchApp, dragApp, closeSidebar, Modifier.fillMaxHeight())
         } else {
             Column(modifier = Modifier.widthIn(min = 240.dp, max = 360.dp)) {
                 Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
@@ -233,7 +251,7 @@ fun SidebarComposeView(
                         ClipboardListContent(items, viewModel, hostView)
                     }
                 } else {
-                    SidebarAppContent(viewModel, launchApp, closeSidebar, Modifier.weight(1f))
+                    SidebarAppContent(viewModel, launchApp, dragApp, closeSidebar, Modifier.weight(1f))
                 }
             }
         }
