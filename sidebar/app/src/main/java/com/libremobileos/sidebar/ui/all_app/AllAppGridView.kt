@@ -8,12 +8,13 @@ import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.ZeroCornerSize
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -29,6 +30,7 @@ import com.android.wm.shell.shared.search.AppLabelSearch
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -38,7 +40,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.android.settingslib.spa.framework.compose.rememberDrawablePainter
 import com.android.wm.shell.shared.animation.Interpolators
 import com.libremobileos.sidebar.R
@@ -93,8 +94,13 @@ fun AllAppGridView(
             focus.clearFocus()
         }
     }
-    val panelColor = Color(context.getColor(if (isSystemInDarkTheme())
-        android.R.color.system_accent2_800 else android.R.color.system_accent2_200))
+    // Side sheet container, exposed corners on the screen side only
+    val corner = MaterialTheme.shapes.extraLarge.topStart
+    val sheetShape = AbsoluteRoundedCornerShape(
+        topLeft = if (fromLeft) ZeroCornerSize else corner,
+        topRight = if (fromLeft) corner else ZeroCornerSize,
+        bottomRight = if (fromLeft) corner else ZeroCornerSize,
+        bottomLeft = if (fromLeft) ZeroCornerSize else corner)
     BoxWithConstraints(modifier = modifier) {
         val scrim = Color(context.getColor(com.android.internal.R.color.shade_panel_scrim))
         Box(Modifier.fillMaxSize().drawBehind {
@@ -103,12 +109,9 @@ fun AllAppGridView(
             .clickable(onClickLabel = stringResource(android.R.string.cancel)) { dismiss() })
         val panelWidth = minOf(600.dp, maxWidth * 0.85f)
         Surface(
-            color = panelColor,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
             contentColor = MaterialTheme.colorScheme.onSurface,
-            shape = if (fromLeft) androidx.compose.foundation.shape.AbsoluteRoundedCornerShape(
-                topRight = 26.dp, bottomRight = 26.dp)
-                else androidx.compose.foundation.shape.AbsoluteRoundedCornerShape(
-                    topLeft = 26.dp, bottomLeft = 26.dp),
+            shape = sheetShape,
             modifier = Modifier.align(if (fromLeft) AbsoluteAlignment.CenterLeft else AbsoluteAlignment.CenterRight)
                 .width(panelWidth).fillMaxHeight().graphicsLayer {
                     translationX = (if (fromLeft) -1 else 1) * size.width * (1f - progress.value)
@@ -170,6 +173,7 @@ fun AllAppGridItem(appInfo: AppInfo, onClick: (AppInfo) -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
         modifier = Modifier.fillMaxWidth().heightIn(min = 104.dp)
+            .clip(MaterialTheme.shapes.large)
             .clickable { onClick(appInfo) }.padding(8.dp)
     ) {
         Image(
@@ -180,7 +184,7 @@ fun AllAppGridItem(appInfo: AppInfo, onClick: (AppInfo) -> Unit) {
         Text(
             text = appInfo.label,
             maxLines = 2,
-            fontSize = 12.sp,
+            style = MaterialTheme.typography.bodySmall,
             textAlign = TextAlign.Center,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 8.dp)
