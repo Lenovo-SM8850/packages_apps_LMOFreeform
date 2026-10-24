@@ -1,52 +1,84 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Sidebar</string>
+    <string name="app_name">サイドバー</string>
     <!--SettingsFragment-->
-    <string name="enable_sideline">Use Sidebar</string>
-    <string name="sidebar_label">Sidebar</string>
-    <string name="sidebar_summary">Quickly open apps in a floating window</string>
-    <string name="sidebar_app_setting_label">Pinned apps</string>
-    <string name="sidebar_settings_description">Open sidebar settings</string>
-    <string name="sidebar_predicted_apps">Show app suggestions</string>
-    <string name="sidebar_predicted_apps_summary">Show upto 6 suggested apps below pinned apps</string>
-    <string name="sidebar_auto_enable_selected_apps">Auto enable sidebar for selected apps</string>
-    <string name="sidebar_auto_enable_selected_apps_summary">Automatically show sidebar when configured apps are launched</string>
-    <string name="sidebar_per_app_config">Configure apps</string>
-    <string name="sidebar_per_app_config_summary">Select apps that should automatically enable sidebar</string>
+    <string name="enable_sideline">サイドバーを使用</string>
+    <string name="sidebar_label">サイドバー</string>
+    <string name="sidebar_summary">フローティング ウィンドウでアプリをすばやく開きます</string>
+    <string name="sidebar_app_setting_label">固定したアプリ</string>
+    <string name="sidebar_settings_description">サイドバーの設定を開く</string>
+    <string name="sidebar_predicted_apps">おすすめのアプリを表示</string>
+    <string name="sidebar_predicted_apps_summary">固定したアプリの下に、おすすめのアプリを最大 6 個表示します</string>
+    <string name="sidebar_auto_enable_selected_apps">選択したアプリでサイドバーを自動的に有効にする</string>
+    <string name="sidebar_auto_enable_selected_apps_summary">設定したアプリを起動したときに、サイドバーを自動的に表示します</string>
+    <string name="sidebar_per_app_config">アプリを設定</string>
+    <string name="sidebar_per_app_config_summary">サイドバーを自動的に有効にするアプリを選択します</string>
     <!-- Sidebar customization -->
-    <string name="sidebar_customization_title">Sidebar customization</string>
+    <string name="sidebar_customization_title">サイドバーのカスタマイズ</string>
     <!-- Sections -->
-    <string name="sidebar_section_slider">Slider settings</string>
-    <string name="sidebar_section_layout">Layout settings</string>
-    <string name="sidebar_section_visual">Visual effects</string>
-    <string name="sidebar_section_miscellaneous">Miscellaneous</string>
+    <string name="sidebar_section_slider">スライダーの設定</string>
+    <string name="sidebar_section_layout">レイアウトの設定</string>
+    <string name="sidebar_section_visual">視覚効果</string>
+    <string name="sidebar_section_miscellaneous">その他</string>
     <!-- Slider settings -->
-    <string name="sidebar_transparency_value">Slider transparency: %1$.2f</string>
-    <string name="sidebar_length_value">Slider length: %1$d</string>
-    <string name="sidebar_width_value">Slider width: %1$d</string>
-    <string name="sidebar_position_label">Slider position</string>
-    <string name="sidebar_left">Left</string>
-    <string name="sidebar_right">Right</string>
+    <string name="sidebar_transparency_value">スライダーの透明度: %1$.2f</string>
+    <string name="sidebar_length_value">スライダーの長さ: %1$d</string>
+    <string name="sidebar_width_value">スライダーの幅: %1$d</string>
+    <string name="sidebar_position_label">スライダーの位置</string>
+    <string name="sidebar_left">左</string>
+    <string name="sidebar_right">右</string>
     <!-- Layout settings -->
     <plurals name="sidebar_columns_value">
-        <item quantity="other">%1$d columns</item>
+        <item quantity="other">%1$d 列</item>
     </plurals>
-    <string name="sidebar_icon_size_value">Icon size: %1$d dp</string>
-    <string name="sidebar_icon_padding_value">Icon padding: %1$d dp</string>
-    <string name="sidebar_icon_padding_summary">Space around each icon</string>
-    <string name="sidebar_column_spacing_value">Column spacing: %1$d dp</string>
-    <string name="sidebar_column_spacing_summary">Space between columns</string>
-    <string name="sidebar_corner_radius_value">Corner radius: %1$d dp</string>
-    <string name="sidebar_bg_transparency_value">Background transparency: %1$.2f</string>
-    <string name="sidebar_reset_defaults">Reset to defaults</string>
+    <string name="sidebar_icon_size_value">アイコンのサイズ: %1$d dp</string>
+    <string name="sidebar_icon_padding_value">アイコンの余白: %1$d dp</string>
+    <string name="sidebar_icon_padding_summary">各アイコンの周囲の余白</string>
+    <string name="sidebar_column_spacing_value">列の間隔: %1$d dp</string>
+    <string name="sidebar_column_spacing_summary">列と列の間の余白</string>
+    <string name="sidebar_corner_radius_value">角の半径: %1$d dp</string>
+    <string name="sidebar_bg_transparency_value">背景の透明度: %1$.2f</string>
+    <string name="sidebar_reset_defaults">デフォルトに戻す</string>
     <!-- Visual effects -->
-    <string name="sidebar_drop_shadow_title">Drop shadow</string>
-    <string name="sidebar_drop_shadow_summary">Add shadow effect to sidebar</string>
+    <string name="sidebar_drop_shadow_title">ドロップ シャドウ</string>
+    <string name="sidebar_drop_shadow_summary">サイドバーに影の効果を追加します</string>
     <!-- Miscellaneous -->
-    <string name="sidebar_tap_to_open_title">Open drawer on tap</string>
-    <string name="sidebar_tap_to_open_summary">Open the sidebar drawer when the slider is tapped</string>
-    <string name="sidebar_swipe_to_open_title">Open drawer on swipe</string>
-    <string name="sidebar_swipe_to_open_summary">Open the sidebar drawer when the slider is swiped horizontally</string>
-    <string name="sidebar_hide_on_gamespace_title">Hide when GameSpace is active</string>
-    <string name="sidebar_hide_on_gamespace_summary">Automatically hide the sidebar slider when a game is running with GameSpace</string>
+    <string name="sidebar_tap_to_open_title">タップでドロワーを開く</string>
+    <string name="sidebar_tap_to_open_summary">スライダーをタップしたときに、サイドバーのドロワーを開きます</string>
+    <string name="sidebar_swipe_to_open_title">スワイプでドロワーを開く</string>
+    <string name="sidebar_swipe_to_open_summary">スライダーを横にスワイプしたときに、サイドバーのドロワーを開きます</string>
+    <string name="sidebar_hide_on_gamespace_title">ゲームスペースの起動中は非表示</string>
+    <string name="sidebar_hide_on_gamespace_summary">ゲームスペースでゲームを実行中は、サイドバーのスライダーを自動的に非表示にします</string>
+    <string name="smart_clipboard_label">スマートクリップボード</string>
+    <string name="smart_clipboard_receiver_label">サイドバー</string>
+    <string name="smart_clipboard_summary">コピー、共有、ドロップしたテキストや画像をサイドバーに保存して、すばやく再利用できます。</string>
+    <string name="smart_clipboard_expiration_label">保存期間</string>
+    <string name="smart_clipboard_expiration_15_min">15 分</string>
+    <string name="smart_clipboard_expiration_1_hour">1 時間</string>
+    <string name="smart_clipboard_expiration_1_day">1 日</string>
+    <string name="smart_clipboard_expiration_1_week">1 週間</string>
+    <string name="smart_clipboard_expiration_forever">無期限</string>
+    <string name="smart_clipboard_empty">テキストや画像をここにコピー、共有、またはドラッグすると、サイドバーに保存されます。</string>
+    <string name="smart_clipboard_share">共有</string>
+    <string name="smart_clipboard_copy_description">クリップボードの項目をもう一度コピー</string>
+    <string name="smart_clipboard_share_description">クリップボードの項目を共有</string>
+    <string name="smart_clipboard_delete_description">クリップボードの項目を削除</string>
+    <string name="smart_clipboard_pin_description">クリップボードの項目を固定</string>
+    <string name="smart_clipboard_unpin_description">クリップボードの項目の固定を解除</string>
+    <string name="smart_clipboard_image_description">クリップボードの画像プレビュー</string>
+    <string name="smart_clipboard_saved">スマートクリップボードに保存しました</string>
+    <string name="smart_clipboard_unsupported">サポートされていないコンテンツ タイプです</string>
+    <string name="smart_clipboard_file_too_large">ファイルが大きすぎるため保存できません（最大 100MB）</string>
+    <string name="smart_clipboard_enabled">スマートクリップボードが有効です</string>
+    <string name="smart_clipboard_clear_history">今すぐ履歴を消去</string>
+    <string name="smart_clipboard_clear_title">クリップボードを消去</string>
+    <string name="smart_clipboard_clear_message">固定されていないクリップボードの履歴を消去しますか？</string>
+    <string name="smart_clipboard_cancel">キャンセル</string>
+    <string name="smart_clipboard_clear">消去</string>
+    <string name="smart_clipboard_missing_file">ファイルが見つかりません</string>
+    <string name="floating_window_unavailable">このアプリはフローティング ウィンドウで開けません</string>
+    <string name="sidebar_all_apps">すべてのアプリ</string>
+    <string name="sidebar_app_search">アプリを検索</string>
+    <string name="sidebar_app_search_empty">アプリがありません</string>
+    <string name="sidebar_app_search_clear">検索をクリア</string>
 </resources>
