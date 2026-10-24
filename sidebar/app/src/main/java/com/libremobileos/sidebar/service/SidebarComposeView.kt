@@ -23,7 +23,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -237,16 +236,18 @@ private fun SidebarItemView(
     ) {
         when (item) {
             is SidebarItem.AllApps -> {
-                Icon(
-                    imageVector = Icons.Outlined.Widgets,
-                    contentDescription = item.appInfo.label,
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier
-                        .size((iconSize - 4).dp)
-                        .clickable {
-                            launchApp(item.appInfo)
-                        }
-                )
+                // The sidebar panel is already the tonal surface; a second circle reads as a misplaced chip
+                IconButton(
+                    onClick = { launchApp(item.appInfo) },
+                    modifier = Modifier.size(iconSize.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_taskbar_all_apps),
+                        contentDescription = stringResource(R.string.sidebar_all_apps),
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size((iconSize - 4).dp)
+                    )
+                }
             }
             is SidebarItem.App -> {
                 Image(
