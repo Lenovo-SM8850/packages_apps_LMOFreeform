@@ -50,6 +50,4 @@
     <string name="sidebar_tap_to_open_summary">Відкрити бічну панель, коли повзунок натиснуто</string>
     <string name="sidebar_swipe_to_open_title">Відкривати панель під час свайпу</string>
     <string name="sidebar_swipe_to_open_summary">Відкрити бічну панель, коли повзунок переміщується по горизонталі</string>
-    <string name="sidebar_hide_on_gamespace_title">Приховувати коли GameSpace активний</string>
-    <string name="sidebar_hide_on_gamespace_summary">Автоматично приховувати бічну панель, коли гра запускається GameSpace</string>
 </resources>

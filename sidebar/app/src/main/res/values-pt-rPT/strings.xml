@@ -48,6 +48,4 @@
     <string name="sidebar_tap_to_open_summary">Abrir a gaveta de barra lateral após tocar no controle deslizante</string>
     <string name="sidebar_swipe_to_open_title">Abrir gaveta ao deslizar</string>
     <string name="sidebar_swipe_to_open_summary">Abrir a gaveta de barra lateral quando o controle deslizante for deslizado horizontalmente</string>
-    <string name="sidebar_hide_on_gamespace_title">Esconder quando o Espaço de jogo estiver ativo</string>
-    <string name="sidebar_hide_on_gamespace_summary">Ocultar automaticamente o controle deslizante de barra lateral quando um jogo estiver em execução com o Espaço de jogo</string>
 </resources>

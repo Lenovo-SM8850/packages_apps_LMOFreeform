@@ -52,6 +52,4 @@
     <string name="sidebar_tap_to_open_summary">فتح درج الشريط الجانبي عند النقر على شريط التمرير</string>
     <string name="sidebar_swipe_to_open_title">فتح القائمة عند السحب</string>
     <string name="sidebar_swipe_to_open_summary">فتح درج الشريط الجانبي عند التمرير أفقيا</string>
-    <string name="sidebar_hide_on_gamespace_title">إخفاء عندما تكون GameSpace نشطة</string>
-    <string name="sidebar_hide_on_gamespace_summary">إخفاء شريط تمرير الشريط الجانبي تلقائياً عند تشغيل اللعبة مع GameSpace</string>
 </resources>

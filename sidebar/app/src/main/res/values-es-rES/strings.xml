@@ -48,6 +48,4 @@
     <string name="sidebar_tap_to_open_summary">Abrir el cajón de la barra lateral cuando se toca el control deslizante</string>
     <string name="sidebar_swipe_to_open_title">Abrir cajón al deslizar</string>
     <string name="sidebar_swipe_to_open_summary">Abrir el cajón de la barra lateral cuando se toca el control deslizante</string>
-    <string name="sidebar_hide_on_gamespace_title">Ocultar cuando GameSpace está activo</string>
-    <string name="sidebar_hide_on_gamespace_summary">Ocultar automáticamente el control deslizante de la barra lateral cuando se esté ejecutando un juego con GameSpace</string>
 </resources>
