@@ -16,6 +16,7 @@ import android.graphics.Point
 import android.os.PersistableBundle
 import com.android.wm.shell.shared.draganddrop.DragAndDropConstants.EXTRA_DISALLOW_HIT_REGION
 import com.android.wm.shell.shared.draganddrop.DragAndDropConstants.EXTRA_SIDEBAR_APP_DRAG
+import android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN
 import android.app.ActivityOptions
 import android.content.ComponentName
 import android.content.Context
@@ -173,7 +174,9 @@ class SidebarView(
 
     private fun launchAppInFloatingWindow(appInfo: AppInfo) {
         val componentName = ComponentName(appInfo.packageName, appInfo.activityName)
-        if (!context.canLaunchInFloatingWindow(componentName, appInfo.userId)) {
+        val drawer = componentName == ComponentName(context,
+            com.libremobileos.sidebar.ui.all_app.AllAppActivity::class.java)
+        if (!drawer && !context.canLaunchInFloatingWindow(componentName, appInfo.userId)) {
             Toast.makeText(context, R.string.floating_window_unavailable, Toast.LENGTH_SHORT).show()
             return
         }
@@ -183,7 +186,8 @@ class SidebarView(
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         val options = ActivityOptions.makeBasic().apply {
-            setLaunchFloatingWindow(true)
+            setLaunchFloatingWindow(!drawer)
+            if (drawer) setLaunchWindowingMode(WINDOWING_MODE_FULLSCREEN)
         }
         runCatching {
             context.startActivityAsUser(intent, options.toBundle(), UserHandle.of(appInfo.userId))
