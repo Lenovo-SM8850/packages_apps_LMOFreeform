@@ -51,7 +51,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun AllAppGridView(
     viewModel: AllAppViewModel,
-    onClick: (AppInfo) -> Unit,
+    onClick: (AppInfo, () -> Unit) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -73,13 +73,13 @@ fun AllAppGridView(
     val scope = rememberCoroutineScope()
     var closing by remember { mutableStateOf(false) }
     val motion = tween<Float>(500, easing = Easing { Interpolators.EMPHASIZED.getInterpolation(it) })
-    fun dismiss(after: () -> Unit = onDismiss) {
+    fun dismiss(restoreImmediately: Boolean = true, after: () -> Unit = onDismiss) {
         if (closing) return
         closing = true
         scope.launch {
             progress.animateTo(0f, motion)
             after()
-            if (context is Activity && !context.isFinishing) {
+            if (restoreImmediately && context is Activity && !context.isFinishing) {
                 closing = false
                 progress.animateTo(1f, motion)
             }
@@ -159,7 +159,12 @@ fun AllAppGridView(
                     modifier = Modifier.weight(1f)
                 ) {
                     items(filtered, key = { "${it.packageName}/${it.activityName}:${it.userId}" }) { appInfo ->
-                        AllAppGridItem(appInfo) { selected -> dismiss { onClick(selected) } }
+                        AllAppGridItem(appInfo) { selected -> dismiss(restoreImmediately = false) {
+                            onClick(selected) {
+                                closing = false
+                                scope.launch { progress.animateTo(1f, motion) }
+                            }
+                        } }
                     }
                 }
             }
