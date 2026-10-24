@@ -16,8 +16,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,11 +44,9 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.OpenWith
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
@@ -161,16 +157,18 @@ private fun SidebarItemView(
     ) {
         when (item) {
             is SidebarItem.AllApps -> {
-                Icon(
-                    imageVector = Icons.Outlined.Widgets,
-                    contentDescription = item.appInfo.label,
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier
-                        .size((iconSize - 4).dp)
-                        .clickable {
-                            launchApp(item.appInfo)
-                        }
-                )
+                // The sidebar panel is already the tonal surface; a second circle reads as a misplaced chip
+                IconButton(
+                    onClick = { launchApp(item.appInfo) },
+                    modifier = Modifier.size(iconSize.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_taskbar_all_apps),
+                        contentDescription = stringResource(R.string.sidebar_all_apps),
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size((iconSize - 4).dp)
+                    )
+                }
             }
             is SidebarItem.App -> {
                 Image(
@@ -193,17 +191,21 @@ private fun SidebarItemView(
                 )
             }
             is SidebarItem.Settings -> {
-                Icon(
-                    imageVector = Icons.Outlined.Settings,
-                    contentDescription = stringResource(R.string.sidebar_settings_description),
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier
-                        .size((iconSize - 4).dp)
-                        .clickable {
-                            viewModel.openSidebarSettings()
-                            closeSidebar()
-                        }
-                )
+                IconButton(
+                    onClick = {
+                        viewModel.openSidebarSettings()
+                        closeSidebar()
+                    },
+                    modifier = Modifier.size(iconSize.dp)
+                ) {
+                    // Same optical size as the all-apps glyph, which fills ~56% of its 48-unit box
+                    Icon(
+                        painter = painterResource(R.drawable.materialsymbols_ic_settings_rounded_filled),
+                        contentDescription = stringResource(R.string.sidebar_settings_description),
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(((iconSize - 4) * 0.65f).dp)
+                    )
+                }
             }
         }
     }
