@@ -48,6 +48,8 @@
         <activity
             android:name=".ui.all_app.AllAppActivity"
             android:exported="true"
+            android:taskAffinity="com.libremobileos.sidebar.drawer"
+            android:theme="@style/Theme.SidebarDrawer"
             android:excludeFromRecents="true"/>
 
         <activity
