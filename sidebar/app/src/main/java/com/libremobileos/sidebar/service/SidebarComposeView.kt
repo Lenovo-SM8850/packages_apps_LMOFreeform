@@ -21,8 +21,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -270,17 +268,21 @@ private fun SidebarItemView(
                 )
             }
             is SidebarItem.Settings -> {
-                Icon(
-                    imageVector = Icons.Outlined.Settings,
-                    contentDescription = stringResource(R.string.sidebar_settings_description),
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier
-                        .size((iconSize - 4).dp)
-                        .clickable {
-                            viewModel.openSidebarSettings()
-                            closeSidebar()
-                        }
-                )
+                IconButton(
+                    onClick = {
+                        viewModel.openSidebarSettings()
+                        closeSidebar()
+                    },
+                    modifier = Modifier.size(iconSize.dp)
+                ) {
+                    // Same optical size as the all-apps glyph, which fills ~56% of its 48-unit box
+                    Icon(
+                        painter = painterResource(R.drawable.materialsymbols_ic_settings_rounded_filled),
+                        contentDescription = stringResource(R.string.sidebar_settings_description),
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(((iconSize - 4) * 0.65f).dp)
+                    )
+                }
             }
         }
     }
