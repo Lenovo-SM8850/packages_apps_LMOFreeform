@@ -1,6 +1,8 @@
 package com.libremobileos.sidebar.ui.all_app
 
+import android.app.Activity
 import android.app.ActivityOptions
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -24,6 +26,7 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.android.wm.shell.shared.sidebar.SidebarLaunchPolicy
 import com.libremobileos.sidebar.bean.AppInfo
 import com.libremobileos.sidebar.R
 import com.libremobileos.sidebar.ui.theme.SidebarTheme
@@ -113,10 +116,28 @@ class AllAppActivity: ComponentActivity() {
         super.onDestroy()
     }
 
-    private fun onClick(appInfo: AppInfo) {
+    private fun onClick(appInfo: AppInfo, onFailure: () -> Unit) {
+        val component = ComponentName(appInfo.packageName, appInfo.activityName)
+        val query = Intent(SidebarLaunchPolicy.ACTION_QUERY_HOME).setPackage("com.android.systemui")
+            .putExtra(SidebarLaunchPolicy.EXTRA_DISPLAY_ID, displayId)
+            .putExtra(Intent.EXTRA_INTENT, Intent.makeMainActivity(component))
+            .putExtra(Intent.EXTRA_USER, UserHandle.of(appInfo.userId))
+        sendOrderedBroadcastAsUser(query, UserHandle.SYSTEM,
+            android.Manifest.permission.INTERNAL_SYSTEM_WINDOW,
+            object : BroadcastReceiver() {
+                override fun onReceive(context: Context, intent: Intent) {
+                    if (isFinishing || isDestroyed) return
+                    if (resultCode == Activity.RESULT_FIRST_USER) finish()
+                    else launchFloatingApp(appInfo, onFailure)
+                }
+            }, null, Activity.RESULT_CANCELED, null, null)
+    }
+
+    private fun launchFloatingApp(appInfo: AppInfo, onFailure: () -> Unit) {
         val componentName = ComponentName(appInfo.packageName, appInfo.activityName)
         if (!canLaunchInFloatingWindow(componentName, appInfo.userId)) {
             Toast.makeText(this, R.string.floating_window_unavailable, Toast.LENGTH_SHORT).show()
+            onFailure()
             return
         }
         val intent = Intent(Intent.ACTION_MAIN).apply {
@@ -129,9 +150,11 @@ class AllAppActivity: ComponentActivity() {
         }
         runCatching {
             startActivityAsUser(intent, options.toBundle(), UserHandle.of(appInfo.userId))
+        }.onSuccess {
+            finish()
         }.onFailure {
             logger.e("startApp failed", it)
+            onFailure()
         }
-        finish()
     }
 }
