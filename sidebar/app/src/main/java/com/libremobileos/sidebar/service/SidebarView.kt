@@ -8,6 +8,9 @@ import android.graphics.Rect
 import android.graphics.RectF
 import com.android.wm.shell.shared.animation.Interpolators
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.BroadcastReceiver
+import com.android.wm.shell.shared.sidebar.SidebarLaunchPolicy.ACTION_QUERY_HOME
 import android.app.PendingIntent
 import android.content.ClipData
 import android.content.ClipDescription
@@ -173,10 +176,33 @@ class SidebarView(
     }
 
     private fun launchAppInFloatingWindow(appInfo: AppInfo) {
+        val component = ComponentName(appInfo.packageName, appInfo.activityName)
+        if (component == ComponentName(context,
+                com.libremobileos.sidebar.ui.all_app.AllAppActivity::class.java)) {
+            launchApp(appInfo, fullscreen = true)
+            return
+        }
+        // Shell also knows overview visibility, which a HOME activity type alone cannot distinguish.
+        val query = Intent(ACTION_QUERY_HOME).setPackage("com.android.systemui")
+            .putExtra(com.android.wm.shell.shared.sidebar.SidebarLaunchPolicy.EXTRA_DISPLAY_ID, composeView.display?.displayId ?: context.displayId)
+            .putExtra(Intent.EXTRA_INTENT, Intent.makeMainActivity(component))
+            .putExtra(Intent.EXTRA_USER, UserHandle.of(appInfo.userId))
+        context.sendOrderedBroadcastAsUser(query, UserHandle.SYSTEM,
+            android.Manifest.permission.INTERNAL_SYSTEM_WINDOW,
+            object : BroadcastReceiver() {
+                override fun onReceive(context: Context, intent: Intent) {
+                    if (isRemoved) return
+                    if (resultCode == Activity.RESULT_FIRST_USER) removeView()
+                    else launchApp(appInfo, resultCode == Activity.RESULT_OK)
+                }
+            }, handler, Activity.RESULT_CANCELED, null, null)
+    }
+
+    private fun launchApp(appInfo: AppInfo, fullscreen: Boolean) {
         val componentName = ComponentName(appInfo.packageName, appInfo.activityName)
         val drawer = componentName == ComponentName(context,
             com.libremobileos.sidebar.ui.all_app.AllAppActivity::class.java)
-        if (!drawer && !context.canLaunchInFloatingWindow(componentName, appInfo.userId)) {
+        if (!fullscreen && !drawer && !context.canLaunchInFloatingWindow(componentName, appInfo.userId)) {
             Toast.makeText(context, R.string.floating_window_unavailable, Toast.LENGTH_SHORT).show()
             return
         }
@@ -186,8 +212,8 @@ class SidebarView(
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         val options = ActivityOptions.makeBasic().apply {
-            setLaunchFloatingWindow(!drawer)
-            if (drawer) setLaunchWindowingMode(WINDOWING_MODE_FULLSCREEN)
+            setLaunchFloatingWindow(!fullscreen && !drawer)
+            if (fullscreen || drawer) setLaunchWindowingMode(WINDOWING_MODE_FULLSCREEN)
         }
         runCatching {
             context.startActivityAsUser(intent, options.toBundle(), UserHandle.of(appInfo.userId))
