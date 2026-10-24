@@ -85,4 +85,7 @@
     <string name="smart_clipboard_missing_file">File missing</string>
     <string name="floating_window_unavailable">This app cannot open in a floating window</string>
     <string name="sidebar_all_apps">All apps</string>
+    <string name="sidebar_app_search">Search apps</string>
+    <string name="sidebar_app_search_empty">No apps found</string>
+    <string name="sidebar_app_search_clear">Clear search</string>
 </resources>
