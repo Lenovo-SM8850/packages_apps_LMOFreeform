@@ -51,6 +51,11 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
         val gestureManager = MGestureManager(this@SidebarService, GestureListener(this@SidebarService))
         View(this).apply {
             background = AppCompatResources.getDrawable(this@SidebarService, R.drawable.ic_line)
+            addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
+                view.setSystemGestureExclusionRects(
+                    listOf(Rect(0, 0, view.width, view.height))
+                )
+            }
             setOnTouchListener { _, event ->
                 gestureManager.onTouchEvent(event)
                 true
@@ -371,11 +376,6 @@ class SidebarService : Service(), SharedPreferences.OnSharedPreferenceChangeList
 
         val transparency = sharedPrefs.getFloat(SLIDER_TRANSPARENCY, 1.0f)
         sideLineView.alpha = transparency
-
-        val currentWidth = getSliderWidth()
-        sideLineView.setSystemGestureExclusionRects(
-            listOf(Rect(0, 0, currentWidth, getSliderLength()))
-        )
 
         updateSidelinePosition()
 
