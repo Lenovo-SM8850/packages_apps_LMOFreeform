@@ -1,12 +1,18 @@
 package com.libremobileos.sidebar.room
 
 import android.content.Context
+import androidx.room.withTransaction
 import androidx.lifecycle.LiveData
 import com.libremobileos.sidebar.room.MyDatabase.Companion.getDatabase
 import kotlinx.coroutines.flow.Flow
 import java.lang.Exception
 
 class DatabaseRepository(context: Context) {
+
+    private val database = getDatabase(context)
+
+    suspend fun <T> clipboardTransaction(block: suspend () -> T): T =
+        database.withTransaction { block() }
 
     private val sidebarAppsDao: SidebarAppsDao
     private val smartClipboardDao: SmartClipboardDao
@@ -118,7 +124,6 @@ class DatabaseRepository(context: Context) {
     }
 
     init {
-        val database = getDatabase(context)
         sidebarAppsDao = database.sidebarAppsDao
         smartClipboardDao = database.smartClipboardDao
     }

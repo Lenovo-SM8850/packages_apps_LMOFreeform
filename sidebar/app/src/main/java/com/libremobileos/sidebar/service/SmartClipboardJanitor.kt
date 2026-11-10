@@ -17,7 +17,7 @@ class SmartClipboardJanitor(
     private val clipboardDir: File,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
-    suspend fun sweep() {
+    suspend fun sweep() = ClipboardPersistence.withOwnership {
         val now = clock()
         val retentionMs = retentionMs(prefs)
         if (retentionMs > 0) {
@@ -27,9 +27,13 @@ class SmartClipboardJanitor(
         repository.trimPinnedHistory(MAX_PINNED_ITEMS).forEach { deleteFile(it) }
         val active = repository.getAllImagePaths().toSet()
         clipboardDir.listFiles()?.forEach { file ->
-            if (file.absolutePath !in active) {
+            if (file.isFile && file.absolutePath !in active) {
                 runCatching { file.delete() }
             }
+        }
+        // Writers stage under the same mutex, so anything left here was abandoned.
+        File(clipboardDir, ".pending").listFiles()?.forEach { file ->
+            if (file.isFile) runCatching { file.delete() }
         }
     }
 

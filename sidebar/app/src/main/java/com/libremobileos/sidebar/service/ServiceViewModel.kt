@@ -58,6 +58,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -570,21 +572,27 @@ class ServiceViewModel(private val application: Application): AndroidViewModel(a
 
     fun deleteSmartClipboardItem(item: SmartClipboardEntity) {
         clipboardScope.launch {
-            repository.deleteSmartClipboardItem(item.id)
-            item.imagePath?.let { clipboardRepository.deleteFile(it) }
+            ClipboardPersistence.withOwnership {
+                repository.deleteSmartClipboardItem(item.id)
+                item.imagePath?.let { clipboardRepository.deleteFile(it) }
+            }
         }
     }
 
     fun clearUnpinnedSmartClipboard() {
         clipboardScope.launch {
-            clipboardRepository.clearUnpinned()
+            ClipboardPersistence.withOwnership {
+                clipboardRepository.clearUnpinned()
+            }
         }
     }
 
     fun toggleSmartClipboardItemPinned(item: SmartClipboardEntity) {
         clipboardScope.launch {
-            repository.setSmartClipboardItemPinned(item.id, !item.isPinned)
-            janitor.schedule()
+            ClipboardPersistence.withOwnership {
+                repository.setSmartClipboardItemPinned(item.id, !item.isPinned)
+                janitor.schedule()
+            }
         }
     }
 
@@ -616,7 +624,9 @@ class ServiceViewModel(private val application: Application): AndroidViewModel(a
         val path = item.imagePath ?: return
         if (File(path).exists()) return
         clipboardScope.launch {
-            repository.deleteSmartClipboardItem(item.id)
+            ClipboardPersistence.withOwnership {
+                repository.deleteSmartClipboardItem(item.id)
+            }
         }
     }
 
@@ -734,7 +744,7 @@ class ServiceViewModel(private val application: Application): AndroidViewModel(a
         primaryClipListenerRegistered = false
     }
 
-    private suspend fun storePrimaryClip(clipData: ClipData): Int {
+    private suspend fun storePrimaryClip(clipData: ClipData): Int = ClipboardPersistence.withOwnership {
         val now = System.currentTimeMillis()
         val contentUris = extractContentUris(clipData)
         var savedCount = 0
@@ -758,11 +768,11 @@ class ServiceViewModel(private val application: Application): AndroidViewModel(a
             }
             if (savedCount > 0) {
                 janitor.schedule()
-                return savedCount
+                return@withOwnership savedCount
             }
         }
 
-        val text = buildClipboardText(clipData)?.takeIf { it.isNotBlank() } ?: return 0
+        val text = buildClipboardText(clipData)?.takeIf { it.isNotBlank() } ?: return@withOwnership 0
         saveSmartClipboardItem(
             SmartClipboardEntity(
                 type = SmartClipboardEntity.TYPE_TEXT,
@@ -772,25 +782,26 @@ class ServiceViewModel(private val application: Application): AndroidViewModel(a
             )
         )
         janitor.schedule()
-        return 1
+        return@withOwnership 1
     }
 
     private suspend fun saveSmartClipboardItem(
         item: SmartClipboardEntity,
         onDuplicate: (() -> Unit)? = null
     ) {
-        if (repository.countByHash(item.contentHash) > 0) {
-            repository.bumpTimestampByHash(item.contentHash, item.createdAt)
-            onDuplicate?.invoke()
-            return
+        val removedPaths = repository.clipboardTransaction {
+            if (repository.countByHash(item.contentHash) > 0) {
+                repository.bumpTimestampByHash(item.contentHash, item.createdAt)
+                null
+            } else {
+                repository.insertSmartClipboardItem(item)
+                repository.trimSmartClipboardHistory(SmartClipboardJanitor.MAX_UNPINNED_ITEMS) +
+                    repository.trimPinnedHistory(SmartClipboardJanitor.MAX_PINNED_ITEMS)
+            }
         }
-        repository.insertSmartClipboardItem(item)
-        repository.trimSmartClipboardHistory(SmartClipboardJanitor.MAX_UNPINNED_ITEMS).forEach {
-            clipboardRepository.deleteFile(it)
-        }
-        repository.trimPinnedHistory(SmartClipboardJanitor.MAX_PINNED_ITEMS).forEach {
-            clipboardRepository.deleteFile(it)
-        }
+        // Delete files only after the row transaction commits successfully.
+        if (removedPaths == null) onDuplicate?.invoke()
+        else removedPaths.forEach { clipboardRepository.deleteFile(it) }
     }
 
     private fun buildClipboardText(clipData: ClipData): String? {
@@ -881,7 +892,9 @@ class ServiceViewModel(private val application: Application): AndroidViewModel(a
             }
         }
 
-        val file = File(smartClipboardDir, "clip_${uuid}_${System.currentTimeMillis()}.$extension")
+        val stagingDir = File(smartClipboardDir, ".pending").apply { mkdirs() }
+        val file = File(stagingDir, "clip_${uuid}_${System.currentTimeMillis()}.$extension")
+        val published = File(smartClipboardDir, file.name)
         val digest = MessageDigest.getInstance("SHA-256")
         runCatching {
             appContext.contentResolver.openInputStream(uri)?.use { input ->
@@ -903,10 +916,11 @@ class ServiceViewModel(private val application: Application): AndroidViewModel(a
                     }
                 }
             } ?: return null
+            check(file.renameTo(published)) { "Unable to publish clipboard file" }
             return PersistedContent(
                 type = type,
                 fileName = fileName,
-                path = file.absolutePath,
+                path = published.absolutePath,
                 mimeType = mimeType,
                 contentHash = hexDigest(digest.digest())
             )
@@ -978,4 +992,11 @@ class ServiceViewModel(private val application: Application): AndroidViewModel(a
         val mimeType: String,
         val contentHash: String
     )
+}
+
+/** One owner for clipboard publication, retention and orphan collection in this process. */
+internal object ClipboardPersistence {
+    private val mutex = Mutex()
+
+    suspend fun <T> withOwnership(block: suspend () -> T): T = mutex.withLock { block() }
 }
