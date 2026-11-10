@@ -26,6 +26,8 @@ import android.os.Looper
 import android.os.UserHandle
 import android.os.UserManager
 import android.util.LruCache
+import android.view.DragAndDropPermissions
+import android.view.DragEvent
 import android.view.View
 import android.webkit.MimeTypeMap
 import android.widget.Toast
@@ -460,9 +462,11 @@ class ServiceViewModel(private val application: Application): AndroidViewModel(a
     fun addClipDataToSmartClipboard(
         clipData: ClipData?,
         enableIfNeeded: Boolean = false,
-        showToast: Boolean = false
+        showToast: Boolean = false,
+        dragPermissions: DragAndDropPermissions? = null
     ) {
         if (clipData == null) {
+            dragPermissions?.release()
             if (showToast) {
                 clipboardScope.launch(Dispatchers.Main) {
                     Toast.makeText(appContext, R.string.smart_clipboard_unsupported, Toast.LENGTH_SHORT).show()
@@ -476,8 +480,11 @@ class ServiceViewModel(private val application: Application): AndroidViewModel(a
                 Toast.makeText(appContext, R.string.smart_clipboard_enabled, Toast.LENGTH_SHORT).show()
             }
         }
-        if (!smartClipboardEnabled) return
-        clipboardScope.launch {
+        if (!smartClipboardEnabled) {
+            dragPermissions?.release()
+            return
+        }
+        val capture = clipboardScope.launch {
             try {
                 val savedCount = storePrimaryClip(clipData)
                 if (showToast) {
@@ -499,6 +506,22 @@ class ServiceViewModel(private val application: Application): AndroidViewModel(a
                 }
             }
         }
+        capture.invokeOnCompletion { dragPermissions?.let { runCatching { it.release() } } }
+    }
+
+    fun importClipboardDrop(event: DragEvent): Boolean {
+        val clip = event.clipData ?: return false
+        val needsGrant = (0 until clip.itemCount).any {
+            clip.getItemAt(it).uri?.scheme == "content"
+        }
+        val grant = if (needsGrant) DragAndDropPermissions.obtain(event) else null
+        if (needsGrant && (grant == null || !grant.takeTransient())) {
+            grant?.let { runCatching { it.release() } }
+            return false
+        }
+        addClipDataToSmartClipboard(clip, enableIfNeeded = true, showToast = true,
+            dragPermissions = grant)
+        return true
     }
 
     fun supportsSmartClipboardContent(description: ClipDescription?): Boolean {

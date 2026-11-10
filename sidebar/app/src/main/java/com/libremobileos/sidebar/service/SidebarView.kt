@@ -188,11 +188,7 @@ class SidebarView(
                     if (!viewModel.supportsSmartClipboardContent(event.clipDescription)) {
                         return@setOnDragListener false
                     }
-                    viewModel.addClipDataToSmartClipboard(
-                        clipData = event.clipData,
-                        enableIfNeeded = true,
-                        showToast = true
-                    )
+                    if (!viewModel.importClipboardDrop(event)) return@setOnDragListener false
                     true
                 }
                 DragEvent.ACTION_DRAG_ENTERED,
