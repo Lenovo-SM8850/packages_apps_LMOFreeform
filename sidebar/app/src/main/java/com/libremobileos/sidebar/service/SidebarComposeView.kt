@@ -26,7 +26,14 @@ import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.shadow.DropShadowPainter
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -41,6 +48,8 @@ import com.libremobileos.sidebar.R
 import com.libremobileos.sidebar.app.SidebarApplication
 import com.libremobileos.sidebar.bean.AppInfo
 import com.libremobileos.sidebar.room.SmartClipboardEntity
+
+private val SHADOW_RADIUS = 8.dp
 
 @Composable
 fun SidebarComposeView(
@@ -76,10 +85,26 @@ fun SidebarComposeView(
     var cardModifier = modifier
     
     if (showShadow) {
-        cardModifier = cardModifier.shadow(
-            elevation = 8.dp,
-            shape = RoundedCornerShape(cornerRadius.dp)
-        )
+        // An elevation shadow assumes an opaque panel and shows through the translucent one, so draw
+        // it outside the outline only. The padding keeps it inside the overlay window.
+        val panelShape = RoundedCornerShape(cornerRadius.dp)
+        cardModifier = cardModifier
+            .padding(SHADOW_RADIUS)
+            .drawWithCache {
+                val outline = Path().apply {
+                    addOutline(panelShape.createOutline(size, layoutDirection, this@drawWithCache))
+                }
+                val shadow = DropShadowPainter(
+                    panelShape,
+                    Shadow(radius = SHADOW_RADIUS, color = Color.Black.copy(alpha = 0.24f))
+                )
+                onDrawWithContent {
+                    clipPath(outline, ClipOp.Difference) {
+                        with(shadow) { draw(size) }
+                    }
+                    drawContent()
+                }
+            }
     }
 
     Card(
