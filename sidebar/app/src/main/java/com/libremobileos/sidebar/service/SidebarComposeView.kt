@@ -3,6 +3,13 @@ package com.libremobileos.sidebar.service
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.text.format.DateUtils
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -10,7 +17,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -19,6 +25,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -39,10 +46,13 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.android.settingslib.spa.framework.compose.rememberDrawablePainter
 import com.libremobileos.sidebar.R
@@ -53,12 +63,23 @@ import kotlin.math.roundToInt
 
 private val SHADOW_RADIUS = 8.dp
 
+/** Width the clipboard sheet adds to the panel; the window grows by exactly this much. */
+val CLIPBOARD_SHEET_WIDTH = 280.dp
+
+// M3 expressive springs: spatial for the sheet width, effects for its alpha
+private val clipboardSpatialSpring = spring<IntSize>(dampingRatio = 0.8f, stiffness = 380f)
+private val clipboardEffectsSpring = spring<Float>(dampingRatio = 1f, stiffness = 1600f)
+
 @Composable
 fun SidebarComposeView(
     viewModel: ServiceViewModel,
     launchApp: (AppInfo) -> Unit,
     dragApp: (AppInfo, Int, android.graphics.Rect) -> Unit,
     closeSidebar: () -> Unit,
+    clipboardExpanded: Boolean,
+    setClipboardExpanded: (Boolean) -> Unit,
+    onClipboardCollapsed: () -> Unit,
+    panelOnRight: Boolean,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -82,9 +103,23 @@ fun SidebarComposeView(
     val allItems = buildList {
         add(SidebarItem.AllApps(viewModel.allAppActivity))
         addAll(sidebarAppList.map { SidebarItem.App(it) })
+        if (smartClipboardEnabled) add(SidebarItem.Clipboard)
         add(SidebarItem.Settings)
     }
-    
+
+    if (!smartClipboardEnabled && clipboardExpanded) {
+        SideEffect { setClipboardExpanded(false) }
+    }
+    val sheetState = remember { MutableTransitionState(false) }
+    val showSheet = clipboardExpanded && smartClipboardEnabled
+    SideEffect { sheetState.targetState = showSheet }
+    val collapsed by rememberUpdatedState(onClipboardCollapsed)
+    LaunchedEffect(sheetState) {
+        // Also fires at animator duration scale 0, where the transition settles at once
+        snapshotFlow { sheetState.isIdle && !sheetState.currentState }
+            .collect { idleCollapsed -> if (idleCollapsed) collapsed() }
+    }
+
     var cardModifier = modifier
     
     if (showShadow) {
@@ -110,19 +145,7 @@ fun SidebarComposeView(
             }
     }
 
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(
-                alpha = backgroundTransparency
-            )
-        ),
-        shape = RoundedCornerShape(cornerRadius.dp),
-        modifier = if (smartClipboardEnabled) {
-            cardModifier.widthIn(min = 72.dp, max = 320.dp)
-        } else {
-            cardModifier
-        }
-    ) {
+    val iconColumn: @Composable () -> Unit = {
         if (columnCount == 1) {
             // Single column
             LazyColumn(
@@ -136,13 +159,10 @@ fun SidebarComposeView(
                         viewModel = viewModel,
                         launchApp = launchApp,
                         dragApp = dragApp,
-                        closeSidebar = closeSidebar
+                        closeSidebar = closeSidebar,
+                        clipboardExpanded = showSheet,
+                        setClipboardExpanded = setClipboardExpanded
                     )
-                }
-                if (smartClipboardEnabled) {
-                    item {
-                        SmartClipboardSection(smartClipboardItems, viewModel, hostView)
-                    }
                 }
             }
         } else {
@@ -166,13 +186,57 @@ fun SidebarComposeView(
                         viewModel = viewModel,
                         launchApp = launchApp,
                         dragApp = dragApp,
-                        closeSidebar = closeSidebar
+                        closeSidebar = closeSidebar,
+                        clipboardExpanded = showSheet,
+                        setClipboardExpanded = setClipboardExpanded
                     )
                 }
-                if (smartClipboardEnabled) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        SmartClipboardSection(smartClipboardItems, viewModel, hostView)
+            }
+        }
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(
+                alpha = backgroundTransparency
+            )
+        ),
+        shape = RoundedCornerShape(cornerRadius.dp),
+        modifier = cardModifier
+    ) {
+        if (!smartClipboardEnabled) {
+            iconColumn()
+        } else {
+            // The sheet opens toward the screen inside the same surface; the icon column stays at
+            // the outer edge whatever the locale's layout direction is.
+            val layoutDirection = LocalLayoutDirection.current
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                Row(modifier = Modifier.fillMaxHeight()) {
+                    val sheet: @Composable () -> Unit = {
+                        AnimatedVisibility(
+                            visibleState = sheetState,
+                            // Measured after the icon column, so the spring's overshoot cannot
+                            // take width from the icons and shift them
+                            modifier = Modifier.weight(1f, fill = false),
+                            enter = expandHorizontally(
+                                clipboardSpatialSpring,
+                                if (panelOnRight) Alignment.End else Alignment.Start
+                            ) + fadeIn(clipboardEffectsSpring),
+                            exit = shrinkHorizontally(
+                                clipboardSpatialSpring,
+                                if (panelOnRight) Alignment.End else Alignment.Start
+                            ) + fadeOut(clipboardEffectsSpring)
+                        ) {
+                            CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+                                SmartClipboardSheet(smartClipboardItems, viewModel, hostView)
+                            }
+                        }
                     }
+                    if (panelOnRight) sheet()
+                    CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+                        iconColumn()
+                    }
+                    if (!panelOnRight) sheet()
                 }
             }
         }
@@ -180,36 +244,43 @@ fun SidebarComposeView(
 }
 
 @Composable
-private fun SmartClipboardSection(
+private fun SmartClipboardSheet(
     smartClipboardItems: List<SmartClipboardEntity>,
     viewModel: ServiceViewModel,
     hostView: android.view.View
 ) {
-    Column {
-        Text(
-            text = stringResource(R.string.smart_clipboard_label),
-            style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 4.dp)
-        )
-        if (smartClipboardItems.isEmpty()) {
+    LazyColumn(
+        contentPadding = PaddingValues(vertical = 4.dp),
+        modifier = Modifier
+            .width(CLIPBOARD_SHEET_WIDTH)
+            .fillMaxHeight()
+    ) {
+        item {
             Text(
-                text = stringResource(R.string.smart_clipboard_empty),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                text = stringResource(R.string.smart_clipboard_label),
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 4.dp)
             )
+        }
+        if (smartClipboardItems.isEmpty()) {
+            item {
+                Text(
+                    text = stringResource(R.string.smart_clipboard_empty),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                )
+            }
         } else {
-            smartClipboardItems.forEach { item ->
-                key(item.id) {
-                    SmartClipboardListItem(
-                        item = item,
-                        onCopy = { viewModel.copySmartClipboardItem(item) },
-                        onShare = { viewModel.shareSmartClipboardItem(item) },
-                        onDelete = { viewModel.deleteSmartClipboardItem(item) },
-                        onStartDrag = { viewModel.startSmartClipboardDrag(hostView, item) },
-                        onPin = { viewModel.toggleSmartClipboardItemPinned(item) }
-                    )
-                }
+            items(smartClipboardItems, key = { it.id }) { item ->
+                SmartClipboardListItem(
+                    item = item,
+                    onCopy = { viewModel.copySmartClipboardItem(item) },
+                    onShare = { viewModel.shareSmartClipboardItem(item) },
+                    onDelete = { viewModel.deleteSmartClipboardItem(item) },
+                    onStartDrag = { viewModel.startSmartClipboardDrag(hostView, item) },
+                    onPin = { viewModel.toggleSmartClipboardItemPinned(item) }
+                )
             }
         }
     }
@@ -223,7 +294,9 @@ private fun SidebarItemView(
     viewModel: ServiceViewModel,
     launchApp: (AppInfo) -> Unit,
     dragApp: (AppInfo, Int, android.graphics.Rect) -> Unit,
-    closeSidebar: () -> Unit
+    closeSidebar: () -> Unit,
+    clipboardExpanded: Boolean,
+    setClipboardExpanded: (Boolean) -> Unit
 ) {
     val host = LocalView.current
     var dragBounds by remember { mutableStateOf(android.graphics.Rect()) }
@@ -267,6 +340,24 @@ private fun SidebarItemView(
                         )
                 )
             }
+            is SidebarItem.Clipboard -> {
+                IconToggleButton(
+                    checked = clipboardExpanded,
+                    onCheckedChange = setClipboardExpanded,
+                    modifier = Modifier.size(iconSize.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.materialsymbols_ic_content_paste_rounded_filled),
+                        contentDescription = stringResource(R.string.smart_clipboard_label),
+                        tint = if (clipboardExpanded) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                        modifier = Modifier.size(((iconSize - 4) * 0.65f).dp)
+                    )
+                }
+            }
             is SidebarItem.Settings -> {
                 IconButton(
                     onClick = {
@@ -291,6 +382,7 @@ private fun SidebarItemView(
 private sealed class SidebarItem {
     data class AllApps(val appInfo: AppInfo) : SidebarItem()
     data class App(val appInfo: AppInfo) : SidebarItem()
+    data object Clipboard : SidebarItem()
     data object Settings : SidebarItem()
 }
 

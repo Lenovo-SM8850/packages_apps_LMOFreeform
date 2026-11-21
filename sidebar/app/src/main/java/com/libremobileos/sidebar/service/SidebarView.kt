@@ -30,6 +30,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.UserHandle
 import android.view.DragEvent
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -41,6 +42,8 @@ import android.window.OnBackInvokedDispatcher
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.AbstractComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
@@ -82,6 +85,13 @@ class SidebarView(
     private var appDragInProgress = false
     private var removeAfterAppDrag = false
     private var appDragBounds = Rect()
+    private val clipboardExpanded = mutableStateOf(false)
+    // The window widens once when the sheet opens and narrows after it has folded away
+    private var clipboardWindowExpanded = false
+    private var collapsedWindowWidth = 0
+    private var clipboardSheetWidth = 0
+    private var baseWindowX = 0
+    private var screenWidth = 0
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private val layoutParams = LayoutParams()
     private val logger = Logger(TAG)
@@ -102,7 +112,7 @@ class SidebarView(
         composeView = object : AbstractComposeView(context) {
             private val backCallback = OnBackInvokedCallback {
                 logger.d("onBackInvoked")
-                removeView()
+                onBack()
             }
 
             override fun onAttachedToWindow() {
@@ -145,7 +155,7 @@ class SidebarView(
                 if (event.keyCode == KeyEvent.KEYCODE_BACK) {
                     if (event.action == KeyEvent.ACTION_UP) {
                         logger.d("KEYCODE_BACK")
-                        removeView()
+                        onBack()
                     }
                     return true
                 }
@@ -160,9 +170,16 @@ class SidebarView(
                         launchApp = { launchAppInFloatingWindow(it) },
                         dragApp = { app, size, bounds -> startAppDrag(app, size, bounds) },
                         closeSidebar = { removeView() },
+                        clipboardExpanded = clipboardExpanded.value,
+                        setClipboardExpanded = { setClipboardExpanded(it) },
+                        onClipboardCollapsed = { onClipboardCollapsed() },
+                        panelOnRight = sidebarPositionX > 0,
                         modifier = Modifier
                             .fillMaxHeight()
-                            .wrapContentWidth()
+                            .wrapContentWidth(
+                                if (sidebarPositionX > 0) AbsoluteAlignment.Right
+                                else AbsoluteAlignment.Left
+                            )
                     )
                 }
             }
@@ -174,6 +191,59 @@ class SidebarView(
             setViewTreeSavedStateRegistryOwner(this@SidebarView)
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
         }
+    }
+
+    private fun onBack() {
+        if (clipboardExpanded.value) setClipboardExpanded(false) else removeView()
+    }
+
+    private fun setClipboardExpanded(expanded: Boolean) {
+        if (isRemoved || clipboardExpanded.value == expanded) return
+        if (expanded && !clipboardWindowExpanded && composeView.isAttachedToWindow) {
+            collapsedWindowWidth = composeView.width
+            clipboardSheetWidth = (CLIPBOARD_SHEET_WIDTH.value *
+                context.resources.displayMetrics.density).roundToInt()
+            clipboardWindowExpanded = true
+            applyWindowWidth()
+            updateWindowLayout()
+        }
+        clipboardExpanded.value = expanded
+    }
+
+    private fun onClipboardCollapsed() {
+        if (clipboardExpanded.value || !clipboardWindowExpanded || isRemoved) return
+        clipboardWindowExpanded = false
+        applyWindowWidth()
+        updateWindowLayout()
+    }
+
+    /**
+     * The collapsed window is centered, offset by x and kept on screen. The widened one is anchored
+     * at that window's outer edge, so the icon column stays put and the sheet grows inward.
+     */
+    private fun applyWindowWidth() {
+        if (!clipboardWindowExpanded) {
+            layoutParams.gravity = Gravity.NO_GRAVITY
+            layoutParams.width = LayoutParams.WRAP_CONTENT
+            layoutParams.x = baseWindowX
+            return
+        }
+        val collapsed = collapsedWindowWidth
+        val left = ((screenWidth - collapsed) / 2 + baseWindowX)
+            .coerceIn(0, maxOf(0, screenWidth - collapsed))
+        layoutParams.width = collapsed + clipboardSheetWidth
+        if (sidebarPositionX > 0) {
+            layoutParams.gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
+            layoutParams.x = screenWidth - (left + collapsed)
+        } else {
+            layoutParams.gravity = Gravity.LEFT or Gravity.CENTER_VERTICAL
+            layoutParams.x = left
+        }
+    }
+
+    private fun updateWindowLayout() {
+        runCatching { windowManager.updateViewLayout(composeView, layoutParams) }
+            .onFailure { logger.e("failed to update the window width", it) }
     }
 
     private fun launchAppInFloatingWindow(appInfo: AppInfo) {
@@ -352,8 +422,11 @@ class SidebarView(
             type = LayoutParams.TYPE_APPLICATION_OVERLAY
             flags = LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     LayoutParams.FLAG_HARDWARE_ACCELERATED
+            // Widening for the clipboard sheet moves the frame's left edge; the window manager's
+            // move animation would slide the whole panel in again from the old position
             privateFlags = LayoutParams.PRIVATE_FLAG_TRUSTED_OVERLAY or
-                    LayoutParams.PRIVATE_FLAG_SYSTEM_APPLICATION_OVERLAY
+                    LayoutParams.PRIVATE_FLAG_SYSTEM_APPLICATION_OVERLAY or
+                    LayoutParams.PRIVATE_FLAG_NO_MOVE_ANIMATION
             format = PixelFormat.RGBA_8888
             windowAnimations = android.R.style.Animation_Dialog
             layoutInDisplayCutoutMode = LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER
@@ -426,7 +499,7 @@ class SidebarView(
     }
 
     fun updateSidebarPosition() {
-        val screenWidth = context.resources.displayMetrics.widthPixels
+        screenWidth = context.resources.displayMetrics.widthPixels
         val screenHeight = context.resources.displayMetrics.heightPixels
         val sidebarHeight = if (context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
             screenHeight / 3
@@ -441,12 +514,12 @@ class SidebarView(
             0
         }
 
+        baseWindowX = sidebarPositionX * (screenWidth / 2 - OFFSET_X)
         layoutParams.apply {
-            width = LayoutParams.WRAP_CONTENT
             height = sidebarHeight
-            x = sidebarPositionX * (screenWidth / 2 - OFFSET_X)
             y = sidebarPositionY
         }
+        applyWindowWidth()
 
         logger.d("updateSidebarPosition: posX=$sidebarPositionX posY=$sidebarPositionY" +
                 " lp.x=${layoutParams.x} lp.y=${layoutParams.y} height=${layoutParams.height}")
